@@ -1,7 +1,8 @@
 module Main where
 
   import System.IO
-  import Communication
+  import TelegramAPI
   import Keys
 
-  main = putStrLn "Hello"
+  main = do putStrLn "Hello World"
+            sendMessage tokenBot jgalat "Hello World"
