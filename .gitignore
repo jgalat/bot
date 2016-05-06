@@ -1,4 +1,5 @@
 src/Keys.hs
+src/web
 dist
 dist-*
 cabal-dev
