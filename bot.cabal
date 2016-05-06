@@ -22,6 +22,7 @@ executable bot
   build-depends:       base >=4.8 && <4.9,
                        bytestring,
                        http-conduit,
+                       http-types,
                        aeson,
                        transformers
   hs-source-dirs:      src
