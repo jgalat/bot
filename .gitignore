@@ -1,5 +1,7 @@
 src/Keys.hs
 src/web
+src/Parser.hs
+*.info
 dist
 dist-*
 cabal-dev
