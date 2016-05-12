@@ -4,7 +4,8 @@ module TelegramAPI
         (
           getMe,
           getUpdates,
-          sendMessage
+          sendMessage,
+          module TelegramAPITypes
         ) where
 
   import Data.Aeson

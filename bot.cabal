@@ -18,7 +18,7 @@ cabal-version:       >=1.10
 executable bot
   main-is:             Main.hs
   other-modules:       Parser
-  -- other-extensions:    .y
+  -- other-extensions: 
   build-depends:       base >=4.8 && <4.9,
                        bytestring,
                        http-conduit,
