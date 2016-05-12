@@ -1,0 +1,3 @@
+command ():
+  var _ = "Hello World" >> chat
+.
