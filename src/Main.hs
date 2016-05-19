@@ -1,23 +1,27 @@
 module Main where
 
   import System.IO
+  import Control.Monad.IO.Class
   import System.Environment
   import Control.Exception (catch, IOException)
+  import Data.Map.Lazy (fromList)
 
   import TelegramAPI
   import Keys
   import CommandAST
   import Parser
+  import Classes
 
+  data MainEnv = MainEnv  { activeCommands  :: Env Comm,
+                            nextUpdateId    :: Int
+                          }
 
-  data State = State {  activeCommands  :: [Command],
-                        nextUpdateId    :: Int
-                      }
+  initMainEnv :: MainEnv
+  initMainEnv = MainEnv { activeCommands = initEnv,
+                          nextUpdateId   = 0
+                        }
 
-  initState :: State
-  initState = State [] 0
-
-  setNextUpdateId :: Int -> State -> State
+  setNextUpdateId :: Int -> MainEnv -> MainEnv
   setNextUpdateId n st = st { nextUpdateId = n }
 
   main :: IO ()
@@ -25,30 +29,30 @@ module Main where
             args <- getArgs
             case args of
               []      -> do putStrLn "Repeating everything..."
-                            echoBot initState
+                            echoBot initMainEnv
               comms   -> do compiled <- mapM compileFile comms
-                            let activeComms = filter (\x -> case x of
-                                                              FailedCommand -> False
-                                                              _             -> True) compiled
-                            mainBot $ initState { activeCommands = activeComms }
+                            let activeComms = fromList $ filter ((/="") . fst) compiled
+                            mainBot $ initMainEnv { activeCommands = activeComms }
 
-  compileFile :: String -> IO Command
-  compileFile file = do content <- catch (readFile file) (\e -> let err = show (e :: IOException)
-                                                                in do putStrLn $ "No se pudo abrir el archivo " ++ file ++ " :" ++ err
-                                                                      return "")
-                        case parseCommand content of
-                          Ok comm     -> return $ Command name comm
-                          Failed str  -> do putStrLn $ file ++ ": " ++ str
-                                            return FailedCommand
+  compileFile :: MonadIO m => String -> m (String, Comm)
+  compileFile file = do content <- liftIO $ catch (readFile file) (\e ->  let err = show (e :: IOException)
+                                                                          in do putStrLn $ file ++ ": No se pudo abrir el archivo. " ++ err
+                                                                                return "")
+                        case content of
+                          ""  ->  return ("", Comm [] [])
+                          _   ->  case parseCommand content of
+                                    Ok comm     -> return (name, comm)
+                                    Failed str  -> do liftIO $ putStrLn (file ++ ": " ++ str)
+                                                      return ("", Comm [] [])
                      where
                        name'  = fst $ span (/='/') $ reverse file
                        name   = fst $ span (/='.') $ reverse name'
 
-  mainBot :: State -> IO ()
+  mainBot :: MainEnv -> IO ()
   mainBot st = do mapM (putStrLn . show) $ activeCommands st
                   return ()
 
-  echoBot :: State -> IO ()
+  echoBot :: MainEnv -> IO ()
   echoBot st = do reply <- getUpdates tokenBot (nextUpdateId st)
                   case reply of
                     Nothing   -> putStrLn "Error Parsing"

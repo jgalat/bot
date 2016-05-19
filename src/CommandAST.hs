@@ -1,18 +1,14 @@
 module CommandAST where
 
-  data Command  = Command String Comm
-                | FailedCommand
-                deriving Show
+  import qualified Data.Map as M
 
   type Var = String
 
-  data Comm = Comm [Parameter] [Statement]
+  data Comm = Comm [(Var, Type)] [Statement]
             deriving Show
 
-  data Parameter  = Parameter Type Var
-                  deriving Show
-
-  data Type = Int
+  data Type = Expected Type
+            | Number
             | String
             | Bool
             | JSON
@@ -25,10 +21,10 @@ module CommandAST where
                   | Do [Statement] Expr
                   deriving Show
 
-  data Expr = ExpTrue
-            | ExpFalse
+  data Expr = TrueExp
+            | FalseExp
             | Var Var
-            | Const Int
+            | Const Float
             | Str String
             | Not Expr
             | And Expr Expr
@@ -43,6 +39,15 @@ module CommandAST where
             | Negate Expr
             | Multiply Expr Expr
             | Divide Expr Expr
+            | Index Expr Expr
             | Get Expr
             | Post Expr Expr
+            | JsonExp JSON
+            deriving Show
+
+  data JSON = JsonObject (M.Map String JSON)
+            | JsonArray [JSON]
+            | JsonString String
+            | JsonNumber Float
+            | JsonBool Bool
             deriving Show

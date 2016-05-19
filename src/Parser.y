@@ -2,7 +2,11 @@
 module Parser where
 
 import Data.Char
+import Control.Exception (catch)
+import qualified Data.Map as M
+
 import CommandAST
+
 }
 
 %monad { P } { thenP } { returnP }
@@ -14,10 +18,15 @@ import CommandAST
 
 %token
     ':'         { TColon }
+    ';'         { TSemiColon}
     '.'         { TDot }
     ','         { TComma }
-    '('         { TOpen }
-    ')'         { TClose }
+    '('         { TParenthesesOpen }
+    ')'         { TParenthesesClose }
+    '['         { TBracketsOpen }
+    ']'         { TBracketsClose }
+    '{'         { TBracesOpen }
+    '}'         { TBracesClose }
     TRUE        { TTrue }
     FALSE       { TFalse }
     '~'         { TNot }
@@ -34,6 +43,7 @@ import CommandAST
     '/'         { TDiv }
     '<<'        { TGet }
     '>>'        { TPost }
+    '!'         { TExclamation }
     STRING      { TString $$ }
     IDENTIFIER  { TIdentifier $$ }
     CONST       { TConst $$ }
@@ -43,12 +53,9 @@ import CommandAST
     ELSE        { TElse }
     WHILE       { TWhile }
     DO          { TDo }
-    TYPEINT     { TTInt }
+    TYPENUMBER  { TTNumber }
     TYPESTRING  { TTString }
     TYPEBOOL    { TTBool }
-    TYPEJSON    { TTJson }
-
-
 
 %left '='
 
@@ -60,28 +67,28 @@ import CommandAST
 %left '+' '-'
 %left '*' '/'
 %left NEG
+%left '!'
 
 %%
 
 command :: { Comm }
         : COMMAND '(' parameters ')' ':' stmts '.'  { Comm $3 $6 }
 
-parameters    :: { [Parameter] }
+parameters    :: { [(Var, Type)] }
               : list_of_parameters                { $1 }
               |                                   { [] }
 
-list_of_parameters  :: { [Parameter] }
+list_of_parameters  :: { [(Var, Type)] }
                     : single_parameter                            { [$1] }
                     | single_parameter  ',' list_of_parameters    { $1 : $3 }
 
-single_parameter    :: { Parameter }
-                    : type ':' IDENTIFIER         { Parameter $1 $3}
+single_parameter    :: { (Var, Type) }
+                    : type IDENTIFIER             { ($2, $1) }
 
 type    :: { Type }
-        : TYPEINT                                 { Int }
+        : TYPENUMBER                              { Number }
         | TYPESTRING                              { String }
         | TYPEBOOL                                { Bool }
-        | TYPEJSON                                { JSON }
 
 stmts   :: { [Statement] }
         : stmt stmts                              { $1 : $2 }
@@ -89,6 +96,7 @@ stmts   :: { [Statement] }
 
 stmt    :: { Statement }
         : VAR IDENTIFIER '=' expr                 { Assign $2 $4 }
+        | VAR IDENTIFIER '=' expr ';'             { Assign $2 $4 }
         | IF expr ':' stmts '.'                   { If $2 $4 }
         | IF expr ':' stmts ELSE ':' stmts '.'    { IfElse $2 $4 $7 }
         | WHILE expr ':' stmts '.'                { While $2 $4 }
@@ -96,8 +104,8 @@ stmt    :: { Statement }
 
 expr    :: { Expr }
         : '(' expr ')'                            { $2 }
-        | TRUE                                    { ExpTrue }
-        | FALSE                                   { ExpFalse }
+        | TRUE                                    { TrueExp }
+        | FALSE                                   { FalseExp }
         | IDENTIFIER                              { Var $1 }
         | CONST                                   { Const $1 }
         | STRING                                  { Str $1 }
@@ -114,9 +122,40 @@ expr    :: { Expr }
         | '-' expr %prec NEG                      { Negate $2 }
         | expr '*' expr                           { Multiply $1 $3 }
         | expr '/' expr                           { Divide $1 $3 }
+        | expr '!' expr                           { Index $1 $3 }
         | '<<' expr                               { Get $2 }
         | expr '>>' expr                          { Post $1 $3 }
+        | json                                    { JsonExp $1 }
 
+json    :: { JSON }
+        : object                                  { JsonObject (M.fromList $1) }
+        | array                                   { JsonArray  $1 }
+
+object  :: { [(String, JSON)] }
+        : '{' '}'                                 { [] }
+        | '{' pairs '}'                           { $2 }
+
+pairs   :: { [(String, JSON)] }
+        : pair                                    { [$1] }
+        | pair ',' pairs                          { $1 : $3 }
+
+pair    :: { (String, JSON) }
+        : STRING ':' value                        { ($1, $3) }
+
+array   :: { [JSON] }
+        : '[' ']'                                 { [] }
+        | '[' values ']'                          { $2 }
+
+values  :: { [JSON] }
+        : value                                   { [$1] }
+        | value ',' values                        { $1 : $3 }
+
+value   :: { JSON }
+        : json                                    { $1 }
+        | STRING                                  { JsonString $1 }
+        | CONST                                   { JsonNumber $1 }
+        | TRUE                                    { JsonBool True }
+        | FALSE                                   { JsonBool False }
 {
 
 data ParseResult a = Ok a | Failed String
@@ -148,7 +187,7 @@ happyError :: P a
 happyError = \ s i -> Failed $ "Línea "++(show (i::LineNumber))++": Error de parseo\n"++(s)
 
 data Token  = TIdentifier Var
-            | TConst Int
+            | TConst Float
             | TString String
             | TCommand
             | TVar
@@ -157,15 +196,19 @@ data Token  = TIdentifier Var
             | TWhile
             | TDo
             | TType
-            | TTInt
+            | TTNumber
             | TTString
             | TTBool
-            | TTJson
             | TDot
             | TComma
-            | TOpen
-            | TClose
+            | TParenthesesOpen
+            | TParenthesesClose
+            | TBracketsOpen
+            | TBracketsClose
+            | TBracesOpen
+            | TBracesClose
             | TColon
+            | TSemiColon
             | TTrue
             | TFalse
             | TNot
@@ -180,6 +223,7 @@ data Token  = TIdentifier Var
             | TMinus
             | TMul
             | TDiv
+            | TExclamation
             | TGet
             | TPost
             | TEOF
@@ -209,15 +253,21 @@ lexer cont s = case s of
                     ('-':cs)                    -> cont TMinus cs
                     ('*':cs)                    -> cont TMul cs
                     ('/':cs)                    -> cont TDiv cs
+                    ('!':cs)                    -> cont TExclamation cs
                     ('.':cs)                    -> cont TDot cs
                     (',':cs)                    -> cont TComma cs
-                    ('(':cs)                    -> cont TOpen cs
-                    (')':cs)                    -> cont TClose cs
+                    ('(':cs)                    -> cont TParenthesesOpen cs
+                    (')':cs)                    -> cont TParenthesesClose cs
+                    ('[':cs)                    -> cont TBracketsOpen cs
+                    (']':cs)                    -> cont TBracketsClose cs
+                    ('{':cs)                    -> cont TBracesOpen cs
+                    ('}':cs)                    -> cont TBracesClose cs
                     (':':cs)                    -> cont TColon cs
+                    (';':cs)                    -> cont TSemiColon cs
                     unknown                     -> \line -> Failed $ "Línea " ++ show line ++ ": No se puede reconocer " ++ (show $ take 10 unknown)++ "..."
 
 lexAlpha :: (Token -> P a) -> P a
-lexAlpha cont s = case span (\c -> isAlpha c || c == '_' ) s  of
+lexAlpha cont s = case span (\c -> isAlpha c || isDigit c || c == '_' ) s  of
                     ("command", rest)  -> cont TCommand rest
                     ("var", rest)      -> cont TVar rest
                     ("if", rest)       -> cont TIf rest
@@ -226,10 +276,9 @@ lexAlpha cont s = case span (\c -> isAlpha c || c == '_' ) s  of
                     ("do", rest)       -> cont TDo rest
                     ("true", rest)     -> cont TTrue rest
                     ("false", rest)    -> cont TFalse rest
-                    ("Int", rest)      -> cont TTInt rest
+                    ("Number", rest)   -> cont TTNumber rest
                     ("String", rest)   -> cont TTString rest
                     ("Bool", rest)     -> cont TTBool rest
-                    ("JSON", rest)     -> cont TTJson rest
                     (var, rest)        -> cont (TIdentifier var) rest
 
 lexString :: (Token -> P a) -> P a
@@ -237,12 +286,14 @@ lexString cont s =  case span (/='\"') s of
                       (string, rest)  ->  case tail' rest of
                                             Just xs ->  cont (TString string) xs
                                             Nothing ->  \line -> Failed $ "Línea " ++ show line ++ ": Falta caracter \'\"\'"
-                    where tail' [] = Nothing
-                          tail' xs = Just $ tail xs
+                    where tail' []      = Nothing
+                          tail' (_:xs)  = Just xs
 
 lexNumber :: (Token -> P a) -> P a
-lexNumber cont s =  case span isDigit s of
-                      (number, rest)  -> cont (TConst (read number)) rest
+lexNumber cont s =  case span (\x -> isDigit x || x == '.') s of
+                      (number, rest)  ->  if (length $ filter (=='.') number) <= 1
+                                          then cont (TConst (read number)) rest
+                                          else \line -> Failed $ "Línea " ++ show line ++ ": Número..."
 
 parseCommand s = parse_command s 1
 }
