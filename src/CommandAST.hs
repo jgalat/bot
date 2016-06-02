@@ -7,7 +7,7 @@ module CommandAST where
   data Comm = Comm [(Var, Type)] [Statement]
             deriving Show
 
-  data Type = Expected Type
+  data Type = Undefined
             | Number
             | String
             | Bool
@@ -34,20 +34,14 @@ module CommandAST where
             | Lower Expr Expr
             | GreaterEquals Expr Expr
             | LowerEquals Expr Expr
+            | Negate Expr
             | Plus Expr Expr
             | Minus Expr Expr
-            | Negate Expr
             | Multiply Expr Expr
             | Divide Expr Expr
             | Index Expr Expr
             | Get Expr
             | Post Expr Expr
-            | JsonExp JSON
-            deriving Show
-
-  data JSON = JsonObject (M.Map String JSON)
-            | JsonArray [JSON]
-            | JsonString String
-            | JsonNumber Float
-            | JsonBool Bool
+            | JsonObject (M.Map String Expr)
+            | JsonArray [Expr]
             deriving Show

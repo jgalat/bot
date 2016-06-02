@@ -92,11 +92,11 @@ type    :: { Type }
 
 stmts   :: { [Statement] }
         : stmt stmts                              { $1 : $2 }
+        | stmt ';' stmts                          { $1 : $3 }
         |                                         { [] }
 
 stmt    :: { Statement }
         : VAR IDENTIFIER '=' expr                 { Assign $2 $4 }
-        | VAR IDENTIFIER '=' expr ';'             { Assign $2 $4 }
         | IF expr ':' stmts '.'                   { If $2 $4 }
         | IF expr ':' stmts ELSE ':' stmts '.'    { IfElse $2 $4 $7 }
         | WHILE expr ':' stmts '.'                { While $2 $4 }
@@ -104,11 +104,8 @@ stmt    :: { Statement }
 
 expr    :: { Expr }
         : '(' expr ')'                            { $2 }
-        | TRUE                                    { TrueExp }
-        | FALSE                                   { FalseExp }
+        | value                                   { $1 }
         | IDENTIFIER                              { Var $1 }
-        | CONST                                   { Const $1 }
-        | STRING                                  { Str $1 }
         | '~' expr                                { Not $2 }
         | expr '&' expr                           { And $1 $3 }
         | expr '|' expr                           { Or $1 $3 }
@@ -125,37 +122,37 @@ expr    :: { Expr }
         | expr '!' expr                           { Index $1 $3 }
         | '<<' expr                               { Get $2 }
         | expr '>>' expr                          { Post $1 $3 }
-        | json                                    { JsonExp $1 }
 
-json    :: { JSON }
+value   :: { Expr }
+        : json                                    { $1 }
+        | TRUE                                    { TrueExp }
+        | FALSE                                   { FalseExp }
+        | CONST                                   { Const $1 }
+        | STRING                                  { Str $1 }
+
+json    :: { Expr }
         : object                                  { JsonObject (M.fromList $1) }
         | array                                   { JsonArray  $1 }
 
-object  :: { [(String, JSON)] }
+object  :: { [(String, Expr)] }
         : '{' '}'                                 { [] }
         | '{' pairs '}'                           { $2 }
 
-pairs   :: { [(String, JSON)] }
+pairs   :: { [(String, Expr)] }
         : pair                                    { [$1] }
         | pair ',' pairs                          { $1 : $3 }
 
-pair    :: { (String, JSON) }
+pair    :: { (String, Expr) }
         : STRING ':' value                        { ($1, $3) }
 
-array   :: { [JSON] }
+array   :: { [Expr] }
         : '[' ']'                                 { [] }
         | '[' values ']'                          { $2 }
 
-values  :: { [JSON] }
+values  :: { [Expr] }
         : value                                   { [$1] }
         | value ',' values                        { $1 : $3 }
 
-value   :: { JSON }
-        : json                                    { $1 }
-        | STRING                                  { JsonString $1 }
-        | CONST                                   { JsonNumber $1 }
-        | TRUE                                    { JsonBool True }
-        | FALSE                                   { JsonBool False }
 {
 
 data ParseResult a = Ok a | Failed String

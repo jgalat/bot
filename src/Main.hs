@@ -11,6 +11,7 @@ module Main where
   import CommandAST
   import Parser
   import Classes
+  import Check
 
   data MainEnv = MainEnv  { activeCommands  :: Env Comm,
                             nextUpdateId    :: Int
