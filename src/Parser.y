@@ -32,7 +32,8 @@ import CommandAST
     '~'         { TNot }
     '&'         { TAnd }
     '|'         { TOr }
-    '='         { TEquals }
+    '='         { TAssign }
+    '=='        { TEquals}
     '>'         { TGreater }
     '<'         { TLower }
     '>='        { TGreaterEq }
@@ -63,7 +64,7 @@ import CommandAST
 %left '&'
 %left '~'
 
-%nonassoc '>' '<' '>=' '<=' '>>' '<<'
+%nonassoc '>' '<' '>=' '<=' '>>' '<<' '=='
 %left '+' '-'
 %left '*' '/'
 %left NEG
@@ -96,7 +97,8 @@ stmts   :: { [Statement] }
         |                                         { [] }
 
 stmt    :: { Statement }
-        : VAR IDENTIFIER '=' expr                 { Assign $2 $4 }
+        : VAR IDENTIFIER '=' expr                 { Declaration $2 $4 }
+        | IDENTIFIER '=' expr                     { Assign $1 $3 }
         | IF expr ':' stmts '.'                   { If $2 $4 }
         | IF expr ':' stmts ELSE ':' stmts '.'    { IfElse $2 $4 $7 }
         | WHILE expr ':' stmts '.'                { While $2 $4 }
@@ -109,7 +111,7 @@ expr    :: { Expr }
         | '~' expr                                { Not $2 }
         | expr '&' expr                           { And $1 $3 }
         | expr '|' expr                           { Or $1 $3 }
-        | expr '=' expr                           { Equals $1 $3 }
+        | expr '==' expr                          { Equals $1 $3 }
         | expr '>' expr                           { Greater $1 $3 }
         | expr '<' expr                           { Lower $1 $3 }
         | expr '>=' expr                          { GreaterEquals $1 $3 }
@@ -188,6 +190,7 @@ data Token  = TIdentifier Var
             | TString String
             | TCommand
             | TVar
+            | TAssign
             | TIf
             | TElse
             | TWhile
@@ -239,13 +242,14 @@ lexer cont s = case s of
                     ('>':('>':cs))              -> cont TPost cs
                     ('>':('=':cs))              -> cont TGreaterEq cs
                     ('<':('=':cs))              -> cont TLowerEq cs
+                    ('=':('=':cs))              -> cont TEquals cs
                     ('\"':cs)                   -> lexString cont cs
                     ('~':cs)                    -> cont TNot cs
                     ('&':cs)                    -> cont TAnd cs
                     ('|':cs)                    -> cont TOr cs
                     ('>':cs)                    -> cont TGreater cs
                     ('<':cs)                    -> cont TLower cs
-                    ('=':cs)                    -> cont TEquals cs
+                    ('=':cs)                    -> cont TAssign cs
                     ('+':cs)                    -> cont TPlus cs
                     ('-':cs)                    -> cont TMinus cs
                     ('*':cs)                    -> cont TMul cs

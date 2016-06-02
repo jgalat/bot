@@ -12,9 +12,10 @@ module CommandAST where
             | String
             | Bool
             | JSON
-            deriving Show
+            deriving (Show, Eq)
 
-  data Statement  = Assign Var Expr
+  data Statement  = Declaration Var Expr
+                  | Assign Var Expr
                   | If Expr [Statement]
                   | IfElse Expr [Statement] [Statement]
                   | While Expr [Statement]

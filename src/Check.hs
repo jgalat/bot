@@ -22,9 +22,19 @@ module Check where
   checkStmts = mapM checkStmt
 
   checkStmt :: (Monad m, MonadError m, MonadState (Env Type) m) => Statement -> m ()
+  checkStmt (Declaration v e) = do  s <- get
+                                    t <- inferExpr e
+                                    set (update (v,t) s)
   checkStmt (Assign v e) = do s <- get
                               t <- inferExpr e
-                              set (update (v,t) s)
+                              case lookUp v s of
+                                Just t' ->  case (t', t) of
+                                              (Undefined, _) -> return ()
+                                              (_, Undefined) -> return ()
+                                              _              -> if t == t'
+                                                                then return ()
+                                                                else raise "Error" -- TODO
+                                Nothing -> raise "Error" -- TODO
   checkStmt (If e stmts) = do t <- inferExpr e
                               case t of
                                 Undefined -> do checkStmts stmts
