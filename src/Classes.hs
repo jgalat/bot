@@ -4,7 +4,7 @@ module Classes where
 
   import Control.Applicative (Applicative(..))
   import Control.Monad       (liftM, ap)
-  import qualified Data.Map.Lazy as M
+  import qualified Data.Map as M
   import CommandAST
 
 

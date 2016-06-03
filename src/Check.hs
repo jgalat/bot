@@ -188,6 +188,8 @@ module Check where
                                 (JSON, String)  -> return JSON
                                 (JSON, Number)  -> return JSON
                                 _               -> raise "Error" -- TODO
-  inferExpr (JsonObject o) = return JSON
+  inferExpr (JsonObject o) =  let l = map snd $ M.toList o
+                              in do mapM inferExpr l
+                                    return JSON
   inferExpr (JsonArray l)  = do mapM inferExpr l
                                 return JSON

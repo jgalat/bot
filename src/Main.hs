@@ -4,7 +4,7 @@ module Main where
   import Control.Monad.IO.Class
   import System.Environment
   import Control.Exception (catch, IOException)
-  import Data.Map.Lazy (fromList)
+  import Data.Map (fromList)
 
   import TelegramAPI
   import Keys
