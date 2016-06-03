@@ -7,24 +7,22 @@ module Check where
   import CommandAST
   import Classes
 
-  initCheckEnvList = [("chat", Number)]
+  initCheckEnvList = [("chat", Number), ("_", Undefined)]
 
-  -- TODO Check if p has a var named "chat"?
   check :: Comm -> Either String ()
   check (Comm _ []) = Left "Warning" -- TODO
   check (Comm p c)  = let s = M.fromList $ initCheckEnvList ++ p
-                      in  case runStateWE (checkStmts c) s of
-                            Left str -> Left str
-                            Right _  -> Right ()
+                      in  either Left (Right . fst) $ runStateWE (checkStmts c) s
 
-
-  checkStmts :: (Monad m, MonadError m, MonadState (Env Type) m) => [Statement] -> m [()]
-  checkStmts = mapM checkStmt
+  checkStmts :: (Monad m, MonadError m, MonadState (Env Type) m) => [Statement] -> m ()
+  checkStmts = mapM_ checkStmt
 
   checkStmt :: (Monad m, MonadError m, MonadState (Env Type) m) => Statement -> m ()
   checkStmt (Declaration v e) = do  s <- get
                                     t <- inferExpr e
-                                    set (update (v,t) s)
+                                    case lookUp v s of
+                                      Just _  -> raise "Error" -- TODO
+                                      Nothing -> set (update (v,t) s)
   checkStmt (Assign v e) = do s <- get
                               t <- inferExpr e
                               case lookUp v s of
@@ -37,39 +35,30 @@ module Check where
                                 Nothing -> raise "Error" -- TODO
   checkStmt (If e stmts) = do t <- inferExpr e
                               case t of
-                                Undefined -> do checkStmts stmts
-                                                return ()
-                                Bool      -> do checkStmts stmts
-                                                return ()
+                                Undefined -> checkStmts stmts
+                                Bool      -> checkStmts stmts
                                 _         -> raise "Error" -- TODO
   checkStmt (IfElse e stmts stmts') = do  t <- inferExpr e
+                                          s <- get
                                           case t of
-                                            Undefined -> do s <- get
-                                                            checkStmts stmts
+                                            Undefined -> do checkStmts stmts
                                                             set s
                                                             checkStmts stmts'
                                                             set s
-                                                            return ()
-                                            Bool      -> do s <- get
-                                                            checkStmts stmts
+                                            Bool      -> do checkStmts stmts
                                                             set s
                                                             checkStmts stmts'
                                                             set s
-                                                            return ()
                                             _         -> raise "Error" -- TODO
   checkStmt (While e stmts) = do  t <- inferExpr e
                                   case t of
-                                    Undefined -> do checkStmts stmts
-                                                    return ()
-                                    Bool      -> do checkStmts stmts
-                                                    return ()
+                                    Undefined -> checkStmts stmts
+                                    Bool      -> checkStmts stmts
                                     _         -> raise "Error" -- TODO
   checkStmt (Do stmts e) = do t <- inferExpr e
                               case t of
-                                Undefined -> do checkStmts stmts
-                                                return ()
-                                Bool      -> do checkStmts stmts
-                                                return ()
+                                Undefined -> checkStmts stmts
+                                Bool      -> checkStmts stmts
                                 _         -> raise "Error" -- TODO
 
   inferExpr :: (Monad m, MonadError m, MonadState (Env Type) m) => Expr -> m Type
@@ -189,7 +178,7 @@ module Check where
                                 (JSON, Number)  -> return JSON
                                 _               -> raise "Error" -- TODO
   inferExpr (JsonObject o) =  let l = map snd $ M.toList o
-                              in do mapM inferExpr l
+                              in do mapM_ inferExpr l
                                     return JSON
-  inferExpr (JsonArray l)  = do mapM inferExpr l
+  inferExpr (JsonArray l)  = do mapM_ inferExpr l
                                 return JSON
