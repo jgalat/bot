@@ -12,6 +12,8 @@ import CommandAST
 %monad { P } { thenP } { returnP }
 
 %name parse_command command
+%name parse_json json
+%name parse_request request
 
 %tokentype { Token }
 %lexer { lexer } { TEOF }
@@ -40,8 +42,8 @@ import CommandAST
     '<='        { TLowerEq }
     '+'         { TPlus }
     '-'         { TMinus }
-    '*'         { TMul }
-    '/'         { TDiv }
+    '*'         { TAsterisc }
+    '/'         { TSlash }
     '<<'        { TGet }
     '>>'        { TPost }
     '!'         { TExclamation }
@@ -155,6 +157,13 @@ values  :: { [Expr] }
         : value                                   { [$1] }
         | value ',' values                        { $1 : $3 }
 
+request :: { (String, [Expr]) }
+        : '/'IDENTIFIER arguments                 { ($2, $3) }
+
+arguments :: { [Expr] }
+          : value arguments                       { $1 : $2 }
+          | IDENTIFIER arguments                  { Str $1 : $2}
+          |                                       { [] }
 {
 
 data ParseResult a = Ok a | Failed String
@@ -221,8 +230,8 @@ data Token  = TIdentifier Var
             | TLowerEq
             | TPlus
             | TMinus
-            | TMul
-            | TDiv
+            | TAsterisc
+            | TSlash
             | TExclamation
             | TGet
             | TPost
@@ -252,8 +261,8 @@ lexer cont s = case s of
                     ('=':cs)                    -> cont TAssign cs
                     ('+':cs)                    -> cont TPlus cs
                     ('-':cs)                    -> cont TMinus cs
-                    ('*':cs)                    -> cont TMul cs
-                    ('/':cs)                    -> cont TDiv cs
+                    ('*':cs)                    -> cont TAsterisc cs
+                    ('/':cs)                    -> cont TSlash cs
                     ('!':cs)                    -> cont TExclamation cs
                     ('.':cs)                    -> cont TDot cs
                     (',':cs)                    -> cont TComma cs
@@ -297,4 +306,6 @@ lexNumber cont s =  case span (\x -> isDigit x || x == '.') s of
                                           else \line -> Failed $ "Línea " ++ show line ++ ": Número..."
 
 parseCommand s = parse_command s 1
+parseJSON s = parse_json s 1
+parseRequest s = parse_request s 1
 }
