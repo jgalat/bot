@@ -2,12 +2,12 @@
 
 module Classes where
 
+  import Control.Monad.IO.Class
   import Control.Applicative (Applicative(..))
   import Control.Monad       (liftM, ap)
   import qualified Data.Map as M
   import CommandAST
-
-
+  import Control.Monad.IO.Class
 
   type Key = String
 
@@ -28,7 +28,6 @@ module Classes where
 
   class Monad m => MonadError m where
     raise :: String -> m a
-
 
   newtype StateWE s a = StateWE { runStateWE :: s -> Either String (a, s) }
 
