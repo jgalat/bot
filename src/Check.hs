@@ -172,11 +172,11 @@ module Check where
   inferExpr (Post e0 e1) = do t0 <- inferExpr e0
                               t1 <- inferExpr e1
                               case (t0, t1) of
-                                (Undefined, _)  -> return JSON
-                                (_, Undefined)  -> return JSON
-                                (JSON, String)  -> return JSON
-                                (JSON, Number)  -> return JSON
-                                _               -> raise "Error" -- TODO
+                                (Undefined, _)    -> return JSON
+                                (_, Undefined)    -> return JSON
+                                (JSON, String)    -> return JSON
+                                (String, Number)  -> return JSON
+                                _                 -> raise "Error" -- TODO
   inferExpr (JsonObject o) =  let l = map snd $ M.toList o
                               in do mapM_ inferExpr l
                                     return JSON
