@@ -4,36 +4,32 @@ module Main where
   import Control.Monad.IO.Class
   import System.Environment
   import Control.Exception (catch, IOException)
-  import Data.Map (fromList)
+  import qualified Data.Map as M
 
-  import TelegramAPI
-  import Keys
+
   import CommandAST
   import Parser
-  import Classes
   import Check
-
-  data MainEnv = MainEnv  { activeCommands  :: Env Comm,
-                            nextUpdateId    :: Int
-                          }
-
-  initMainEnv :: MainEnv
-  initMainEnv = MainEnv { activeCommands = initEnv,
-                          nextUpdateId   = 0
-                        }
-
-  setNextUpdateId :: Int -> MainEnv -> MainEnv
-  setNextUpdateId n st = st { nextUpdateId = n }
+  import Bot
+  import Keys
 
   main :: IO ()
-  main = do putStrLn "Hello World"
+  main = do putStrLn "Saluton Mondo"
             args <- getArgs
             case args of
               []      -> do putStrLn "Repeating everything..."
-                            echoBot initMainEnv
-              comms   -> do compiled <- mapM compileFile comms
-                            let activeComms = fromList $ filter ((/="") . fst) compiled
-                            mainBot $ initMainEnv { activeCommands = activeComms }
+                            echoBot $ initBotState { token = tokenBot }
+              files   -> do parsed <- mapM compileFile files
+                            let parsedOk  = filter ((/="") . fst) parsed
+                            let checked   = map (\(n, c) -> (n, check c)) parsedOk
+                            let failed    = filter (\(_, r) ->  case r of
+                                                                  Left _ -> True
+                                                                  _      -> False) checked
+                            mapM_ (\(n, Left err) -> putStrLn $ n ++ ": " ++ err) failed
+                            let checkedOk = M.difference (M.fromList parsedOk) (M.fromList failed)
+                            mapM_ (\(n, _) -> putStrLn $ n ++ ": Ok") (M.toList checkedOk)
+                            mainBot $ initBotState {  activeCommands = checkedOk,
+                                                      token = tokenBot }
 
   compileFile :: MonadIO m => String -> m (String, Comm)
   compileFile file = do content <- liftIO $ catch (readFile file) (\e ->  let err = show (e :: IOException)
@@ -48,20 +44,3 @@ module Main where
                      where
                        name'  = fst $ span (/='/') $ reverse file
                        name   = fst $ span (/='.') $ reverse name'
-
-  mainBot :: MainEnv -> IO ()
-  mainBot st = do mapM (putStrLn . show) $ activeCommands st
-                  return ()
-
-  echoBot :: MainEnv -> IO ()
-  echoBot st = do reply <- getUpdates tokenBot (nextUpdateId st)
-                  case reply of
-                    Nothing   -> putStrLn "Error Parsing"
-                    Just rep  -> case ok rep of
-                                    True -> case updates rep of
-                                              []  -> do putStrLn "No Updates..."
-                                                        echoBot st
-                                              xs  -> do putStrLn "New Updates!"
-                                                        mapM (\x -> do  putStrLn "Replying..."
-                                                                        sendMessage tokenBot (chat_id $ chat $ message x) (maybe "(null)" id $ text $ message x)) xs
-                                                        echoBot $ setNextUpdateId (update_id (last xs) + 1) st
