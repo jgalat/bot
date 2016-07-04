@@ -2,27 +2,32 @@
 
 module Check where
 
-  import qualified Data.Map as M
+  import Control.Monad.State
+  import Control.Monad.Except
 
   import CommandAST
-  import Classes
+  import Environment
+  import Monads (Check, runChecker)
 
   initCheckEnvList = [("chat", Number), ("_", Undefined)]
 
   check :: Comm -> Either String ()
   check (Comm _ []) = Left "Warning" -- TODO
-  check (Comm p c)  = let s = M.fromList $ initCheckEnvList ++ p
-                      in  either Left (Right . fst) $ runStateWE (checkStmts c) s
+  check (Comm p c)  = let s = envFromList $ initCheckEnvList ++ p
+                      in runChecker (checkStmts c) s
 
-  checkStmts :: (Monad m, MonadError m, MonadState (Env Type) m) => [Statement] -> m ()
+  raise :: (Monad m, MonadError String m) => String -> m a
+  raise = throwError
+
+  checkStmts ::(Monad m, MonadError String m, MonadState (Env Type) m) => [Statement] -> m ()
   checkStmts = mapM_ checkStmt
 
-  checkStmt :: (Monad m, MonadError m, MonadState (Env Type) m) => Statement -> m ()
+  checkStmt :: (Monad m, MonadError String m, MonadState (Env Type) m) => Statement -> m ()
   checkStmt (Declaration v e) = do  s <- get
                                     t <- inferExpr e
                                     case lookUp v s of
                                       Just _  -> raise "Error" -- TODO
-                                      Nothing -> set (update (v,t) s)
+                                      Nothing -> put (update (v,t) s)
   checkStmt (Assign v e) = do s <- get
                               t <- inferExpr e
                               case lookUp v s of
@@ -42,13 +47,13 @@ module Check where
                                           s <- get
                                           case t of
                                             Undefined -> do checkStmts stmts
-                                                            set s
+                                                            put s
                                                             checkStmts stmts'
-                                                            set s
+                                                            put s
                                             Bool      -> do checkStmts stmts
-                                                            set s
+                                                            put s
                                                             checkStmts stmts'
-                                                            set s
+                                                            put s
                                             _         -> raise "Error" -- TODO
   checkStmt (While e stmts) = do  t <- inferExpr e
                                   case t of
@@ -61,7 +66,7 @@ module Check where
                                 Bool      -> checkStmts stmts
                                 _         -> raise "Error" -- TODO
 
-  inferExpr :: (Monad m, MonadError m, MonadState (Env Type) m) => Expr -> m Type
+  inferExpr :: (Monad m, MonadError String m, MonadState (Env Type) m) => Expr -> m Type
   inferExpr TrueExp = return Bool
   inferExpr FalseExp = return Bool
   inferExpr (Var var) = do  s <- get
@@ -177,7 +182,7 @@ module Check where
                                 (JSON, String)    -> return JSON
                                 (String, Number)  -> return JSON
                                 _                 -> raise "Error" -- TODO
-  inferExpr (JsonObject o) =  let l = map snd $ M.toList o
+  inferExpr (JsonObject o) =  let l = map snd $ envToList o
                               in do mapM_ inferExpr l
                                     return JSON
   inferExpr (JsonArray l)  = do mapM_ inferExpr l

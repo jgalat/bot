@@ -1,7 +1,7 @@
 module Bot where
 
   import TelegramAPI
-  import Classes
+  import Environment
   import CommandAST
   import Parser (parseRequest)
 

@@ -1,6 +1,6 @@
 module CommandAST where
 
-  import qualified Data.Map as M
+  import Data.Map
 
   type Var = String
 
@@ -43,6 +43,6 @@ module CommandAST where
             | Index Expr Expr
             | Get Expr
             | Post Expr Expr
-            | JsonObject (M.Map String Expr)
+            | JsonObject (Map String Expr)
             | JsonArray [Expr]
             deriving Show
