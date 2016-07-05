@@ -22,3 +22,6 @@ module Environment where
 
   envToList :: Env v -> [(Key, v)]
   envToList = M.toList
+
+  envDifference :: Env a -> Env b -> Env a
+  envDifference = M.difference

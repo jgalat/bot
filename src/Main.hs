@@ -4,13 +4,14 @@ module Main where
   import Control.Monad.IO.Class
   import System.Environment
   import Control.Exception (catch, IOException)
-  import qualified Data.Map as M
 
-
+  import Environment
   import CommandAST
   import Parser
   import Check
   import Bot
+  import Monads
+  import State
   import Keys
 
   main :: IO ()
@@ -18,7 +19,10 @@ module Main where
             args <- getArgs
             case args of
               []      -> do putStrLn "Repeating everything..."
-                            echoBot $ initBotState { token = tokenBot }
+                            r <- runBot echoBot $ initBotState { token = tokenBot }
+                            case r of
+                              Left err -> putStrLn "Error" -- TODO
+                              _        -> return ()
               files   -> do parsed <- mapM compileFile files
                             let parsedOk  = filter ((/="") . fst) parsed
                             let checked   = map (\(n, c) -> (n, check c)) parsedOk
@@ -26,10 +30,14 @@ module Main where
                                                                   Left _ -> True
                                                                   _      -> False) checked
                             mapM_ (\(n, Left err) -> putStrLn $ n ++ ": " ++ err) failed
-                            let checkedOk = M.difference (M.fromList parsedOk) (M.fromList failed)
-                            mapM_ (\(n, _) -> putStrLn $ n ++ ": Ok") (M.toList checkedOk)
-                            mainBot $ initBotState {  activeCommands = checkedOk,
-                                                      token = tokenBot }
+                            let checkedOk = envDifference (envFromList parsedOk) (envFromList failed)
+                            mapM_ (\(n, _) -> putStrLn $ n ++ ": Ok") (envToList checkedOk)
+                            r <- runBot mainBot $ initBotState {  activeCommands = checkedOk,
+                                                                  token = tokenBot }
+                            case r of
+                              Left err -> putStrLn "Error" -- TODO
+                              _        -> return ()
+
 
   compileFile :: MonadIO m => String -> m (String, Comm)
   compileFile file = do content <- liftIO $ catch (readFile file) (\e ->  let err = show (e :: IOException)

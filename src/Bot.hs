@@ -1,49 +1,44 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Bot where
+
+  import Control.Monad.State
+  import Control.Monad.Except
+  import Control.Monad.IO.Class
 
   import TelegramAPI
   import Environment
   import CommandAST
   import Parser (parseRequest)
+  import State
+  import Monads (Bot, raise)
 
-  data BotState = BotState  { activeCommands  :: Env Comm,
-                              updateId        :: Int,
-                              token           :: String
-                            }
+  echoBot :: Bot (Either String ())
+  echoBot = do  s     <- get
+                reply <- getUpdates (token s) (updateId s)
+                case reply of
+                  Nothing   -> raise "Error Parsing!"
+                  Just rep  -> case ok rep of
+                                True -> case updates rep of
+                                          []  -> (liftIO $ putStrLn "No Updates...") >> echoBot
+                                          xs  -> do (liftIO $ putStrLn "New Updates!")
+                                                    mapM_ (\x -> do liftIO $ putStrLn "Replying..."
+                                                                    sendMessage (token s) (chat_id $ chat $ message x) (maybe "(null)" id $ text $ message x)) xs
+                                                    liftM Right $ put (s { updateId = (update_id (last xs) + 1) })
+                                                    echoBot
+                                _    -> echoBot
 
-  initBotState :: BotState
-  initBotState = BotState { activeCommands  = initEnv,
-                            updateId        = 0,
-                            token           = ""
-                          }
-
-  type Bot a = IO a
-
-  setNextUpdateId :: Int -> BotState -> BotState
-  setNextUpdateId n s = s { updateId = n }
-
-  echoBot :: BotState -> Bot ()
-  echoBot s = do  reply <- getUpdates (token s) (updateId s)
-                  case reply of
-                    Nothing   -> putStrLn "Error Parsing" >> echoBot s
-                    Just rep  -> case ok rep of
-                                  True -> case updates rep of
-                                            []  -> putStrLn "No Updates..." >> echoBot s
-                                            xs  -> do putStrLn "New Updates!"
-                                                      mapM_ (\x -> do putStrLn "Replying..."
-                                                                      sendMessage (token s) (chat_id $ chat $ message x) (maybe "(null)" id $ text $ message x)) xs
-                                                      echoBot (setNextUpdateId (update_id (last xs) + 1) s)
-                                  _    -> echoBot s
-
-
-  mainBot :: BotState -> Bot ()
-  mainBot s = do  reply <- getUpdates (token s) (updateId s)
-                  case reply of
-                    Nothing   -> putStrLn "Error Parsing" >> mainBot s
-                    Just rep  -> case ok rep of
-                                  True -> case updates rep of
-                                            []    -> mainBot s
-                                            upds  -> do let texts = map (maybe "" id . text . message) upds
-                                                        let parsedTexts = map parseRequest texts
-                                                        mapM_ (putStrLn . show) parsedTexts
-                                                        mainBot (setNextUpdateId (update_id (last upds) + 1) s)
-                                  _    -> putStrLn "Fail!" >> mainBot s
+  mainBot :: Bot (Either String ())
+  mainBot = do  s     <- get
+                reply <- getUpdates (token s) (updateId s)
+                case reply of
+                  Nothing   -> raise "Error Parsing!"
+                  Just rep  -> case ok rep of
+                                True -> case updates rep of
+                                          []    -> mainBot
+                                          upds  -> let  texts = map (maybe "" id . text . message) upds
+                                                        parsedTexts = map parseRequest texts
+                                                    in  do  mapM_ (liftIO . putStrLn . show) parsedTexts
+                                                            liftM Right $ put (s { updateId = (update_id (last upds) + 1) })
+                                                            mainBot
+                                _    -> (liftIO $ putStrLn "Fail!") >> mainBot
