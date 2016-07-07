@@ -1,10 +1,11 @@
 module CommandAST where
 
   import Data.Map
+  import Environment
 
   type Var = String
 
-  data Comm = Comm [(Var, Type)] [Statement]
+  data Comm = Comm (Env Type) [(Var, Type)] [Statement]
             deriving Show
 
   data Type = Undefined

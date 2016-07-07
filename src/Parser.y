@@ -75,7 +75,7 @@ import CommandAST
 %%
 
 command :: { Comm }
-        : COMMAND '(' parameters ')' ':' stmts '.'  { Comm $3 $6 }
+        : COMMAND '(' parameters ')' ':' stmts '.'  { Comm M.empty $3 $6 }
 
 parameters    :: { [(Var, Type)] }
               : list_of_parameters                { $1 }

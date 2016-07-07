@@ -7,13 +7,14 @@ module Check where
 
   import CommandAST
   import Environment
-  import State (initCheckEnvList)
-  import Monads
+  import State (initTypeEnvList)
+  import Monads (Check, runChecker, raise)
 
-  check :: Comm -> Either String ()
-  check (Comm _ []) = Left "Warning" -- TODO
-  check (Comm p c)  = let s = envFromList $ initCheckEnvList ++ p
-                      in runChecker (checkStmts c) s
+  check :: Comm -> Either String Comm
+  check (Comm _ p c)  = let s = envFromList $ initTypeEnvList ++ p
+                        in case runChecker (checkStmts c) s of
+                            (Left err, _) -> Left err
+                            (Right _, s)  -> Right (Comm s p c)
 
   checkStmts :: (Monad m, MonadError String m, MonadState (Env Type) m) => [Statement] -> m ()
   checkStmts = mapM_ checkStmt

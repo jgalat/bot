@@ -9,11 +9,12 @@ module Bot where
   import TelegramAPI
   import Environment
   import CommandAST
-  import Parser (parseRequest)
-  import State
+  import Parser (ParseResult(..), parseRequest)
+  import State (BotState (..), initExecState)
   import Monads (Bot, raise)
+  import Execute
 
-  echoBot :: Bot (Either String ())
+  echoBot :: Bot ()
   echoBot = do  s     <- get
                 reply <- getUpdates (token s) (updateId s)
                 case reply of
@@ -28,7 +29,7 @@ module Bot where
                                                     echoBot
                                 _    -> echoBot
 
-  mainBot :: Bot (Either String ())
+  mainBot :: Bot ()
   mainBot = do  s     <- get
                 reply <- getUpdates (token s) (updateId s)
                 case reply of
@@ -36,9 +37,23 @@ module Bot where
                   Just rep  -> case ok rep of
                                 True -> case updates rep of
                                           []    -> mainBot
-                                          upds  -> let  texts = map (maybe "" id . text . message) upds
-                                                        parsedTexts = map parseRequest texts
-                                                    in  do  mapM_ (liftIO . putStrLn . show) parsedTexts
+                                          upds  -> let  requests = map (\u ->
+                                                                  ((chat_id . chat . message) u, maybe "" id $ (text . message) u)) upds
+                                                        parsedRequests = map (\(c, r) -> (c, parseRequest r)) requests
+                                                        requestsOk = map (\(c, Ok r) -> (c, r)) $
+                                                                      filter (\(_, r) -> case r of
+                                                                                          Ok _ -> True
+                                                                                          _    -> False) parsedRequests
+                                                    in  do  execs <- mapM (\(ch,(r,ar)) ->
+                                                                                case lookUp r (activeCommands s) of
+                                                                                  Just cmd -> do  exec <- liftIO $ execute ar (initExecState ch) cmd
+                                                                                                  case exec of
+                                                                                                    Left err -> return (Left (r ++": "++err))
+                                                                                                    _        -> return exec
+                                                                                  Nothing  -> return (Left (r ++ ": not found"))) requestsOk
+                                                            mapM (\exec -> case exec of
+                                                                              Left err  -> liftIO $ putStrLn err
+                                                                              _         -> return ()) execs
                                                             liftM Right $ put (s { updateId = (update_id (last upds) + 1) })
                                                             mainBot
-                                _    -> (liftIO $ putStrLn "Fail!") >> mainBot
+                                _    -> (liftIO $ putStrLn "Failed rep!") >> mainBot

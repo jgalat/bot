@@ -25,3 +25,6 @@ module Environment where
 
   envDifference :: Env a -> Env b -> Env a
   envDifference = M.difference
+
+  envUnion :: Env a -> Env a -> Env a
+  envUnion = M.union

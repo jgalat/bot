@@ -2,16 +2,17 @@ module Main where
 
   import System.IO
   import Control.Monad.IO.Class
-  import System.Environment
+  import System.Environment (getArgs)
   import Control.Exception (catch, IOException)
+  import Data.List
 
   import Environment
-  import CommandAST
-  import Parser
-  import Check
-  import Bot
-  import Monads
-  import State
+  import CommandAST (Comm (..))
+  import Parser (parseCommand, ParseResult (..))
+  import Check (check)
+  import Bot (mainBot, echoBot)
+  import Monads (runBot, Bot)
+  import State (BotState (..), initBotState)
   import Keys
 
   main :: IO ()
@@ -26,14 +27,14 @@ module Main where
               files   -> do parsed <- mapM compileFile files
                             let parsedOk  = filter ((/="") . fst) parsed
                             let checked   = map (\(n, c) -> (n, check c)) parsedOk
-                            let failed    = filter (\(_, r) ->  case r of
-                                                                  Left _ -> True
-                                                                  _      -> False) checked
+                            let (successful, failed) = partition (\(_, r) ->  case r of
+                                                                                Right _ -> True
+                                                                                _       -> False) checked
                             mapM_ (\(n, Left err) -> putStrLn $ n ++ ": " ++ err) failed
-                            let checkedOk = envDifference (envFromList parsedOk) (envFromList failed)
-                            mapM_ (\(n, _) -> putStrLn $ n ++ ": Ok") (envToList checkedOk)
-                            r <- runBot mainBot $ initBotState {  activeCommands = checkedOk,
-                                                                  token = tokenBot }
+                            mapM_ (\(n, _) -> putStrLn $ n ++ ": Ok") successful
+                            let activeComms = envFromList $ map (\(n, Right c) -> (n, c)) successful
+                            r <- runBot mainBot $ initBotState {  activeCommands  = activeComms,
+                                                                  token           = tokenBot }
                             case r of
                               Left err -> putStrLn "Error" -- TODO
                               _        -> return ()
@@ -44,11 +45,11 @@ module Main where
                                                                           in do putStrLn $ file ++ ": No se pudo abrir el archivo. " ++ err
                                                                                 return "")
                         case content of
-                          ""  ->  return ("", Comm [] [])
+                          ""  ->  return ("", Comm initEnv [] [])
                           _   ->  case parseCommand content of
                                     Ok comm     -> return (name, comm)
                                     Failed str  -> do liftIO $ putStrLn (file ++ ": " ++ str)
-                                                      return ("", Comm [] [])
+                                                      return ("", Comm initEnv [] [])
                      where
                        name'  = fst $ span (/='/') $ reverse file
                        name   = fst $ span (/='.') $ reverse name'
