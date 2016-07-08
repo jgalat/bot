@@ -26,7 +26,7 @@ module CommandAST where
   data Expr = TrueExp
             | FalseExp
             | Var Var
-            | Const Float
+            | Const Double
             | Str String
             | Not Expr
             | And Expr Expr

@@ -1,0 +1,4 @@
+command (Number i):
+  var succ = i + 1
+  _ = succ >> chat
+.

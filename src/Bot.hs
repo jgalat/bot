@@ -46,7 +46,7 @@ module Bot where
                                                                                           _    -> False) parsedRequests
                                                     in  do  execs <- mapM (\(ch,(r,ar)) ->
                                                                                 case lookUp r (activeCommands s) of
-                                                                                  Just cmd -> do  exec <- liftIO $ execute ar (initExecState ch) cmd
+                                                                                  Just cmd -> do  exec <- liftIO $ execute ar (initExecState ch (token s)) cmd
                                                                                                   case exec of
                                                                                                     Left err -> return (Left (r ++": "++err))
                                                                                                     _        -> return exec

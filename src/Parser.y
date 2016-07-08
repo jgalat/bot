@@ -195,7 +195,7 @@ happyError :: P a
 happyError = \ s i -> Failed $ "Línea "++(show (i::LineNumber))++": Error de parseo\n"++(s)
 
 data Token  = TIdentifier Var
-            | TConst Float
+            | TConst Double
             | TString String
             | TCommand
             | TVar

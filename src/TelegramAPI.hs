@@ -5,13 +5,17 @@ module TelegramAPI
           getMe,
           getUpdates,
           sendMessage,
+          sendMessage',
           module TelegramAPITypes
         ) where
 
   import Data.Aeson
   import Control.Monad.IO.Class
+  import Data.ByteString.Lazy
+
   import TelegramAPITypes
   import Communication
+
 
   apiURL :: String
   apiURL = "https://api.telegram.org/bot"
@@ -25,3 +29,7 @@ module TelegramAPI
   sendMessage :: (MonadIO m) => String -> Int -> String -> m (Maybe Reply)
   sendMessage token to msg =  let json = encode SimpleMessage {to = to, msg = msg}
                               in  decode <$> liftIO (post (apiURL ++ token ++ "/sendMessage") json)
+
+  sendMessage' :: (MonadIO m) => String -> Int -> String -> m (ByteString)
+  sendMessage' token to msg = let json = encode SimpleMessage {to = to, msg = msg}
+                              in liftIO (post (apiURL ++ token ++ "/sendMessage") json)

@@ -178,6 +178,7 @@ module Check where
                                 (_, Undefined)    -> return JSON
                                 (JSON, String)    -> return JSON
                                 (String, Number)  -> return JSON
+                                (Number, Number)  -> return JSON
                                 _                 -> raise "Error" -- TODO
   inferExpr (JsonObject o) =  let l = map snd $ envToList o
                               in do mapM_ inferExpr l

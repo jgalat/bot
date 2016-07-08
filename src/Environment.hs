@@ -14,6 +14,11 @@ module Environment where
   lookUp :: Key -> Env v -> Maybe v
   lookUp = M.lookup
 
+  lookUp' :: Key -> Env v -> v
+  lookUp' k e = case lookUp k e of
+                  Just v  -> v
+                  _       -> error "This shouldn't happen if you knew it was already there..."
+
   update :: (Key, v) -> Env v -> Env v
   update (k,v) e = M.insert k v e
 

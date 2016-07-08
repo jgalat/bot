@@ -18,10 +18,12 @@ module State where
                           }
 
   data ExecState = ExecState  { typeEnv :: Env Type,
-                                exprEnv :: Env Expr
+                                exprEnv :: Env Expr,
+                                tokenBot:: String
                               }
 
-  initExecState :: Int -> ExecState
-  initExecState chat = ExecState  { typeEnv = envFromList initTypeEnvList,
-                                    exprEnv = envFromList [("chat", Const (fromIntegral chat)), ("_", Const 0)]
-                                  }
+  initExecState :: Int -> String -> ExecState
+  initExecState chat token = ExecState  { typeEnv = envFromList initTypeEnvList,
+                                          exprEnv = envFromList [("chat", Const (fromIntegral chat)), ("_", Const 0)],
+                                          tokenBot = token
+                                        }
