@@ -93,10 +93,16 @@ module Execute where
                                         (Const n1, Const n2) -> if (n1 == n2)
                                                                 then return TrueExp
                                                                 else return FalseExp
+                                        (Str s1, Str s2)     -> if (s1 == s2)
+                                                                then return TrueExp
+                                                                else return FalseExp
   evalExpr (Greater expr1 expr2) = do e1 <- evalExpr expr1
                                       e2 <- evalExpr expr2
                                       case (e1, e2) of
                                         (Const n1, Const n2) -> if (n1 > n2)
+                                                                then return TrueExp
+                                                                else return FalseExp
+                                        (Str s1, Str s2)     -> if (s1 > s2)
                                                                 then return TrueExp
                                                                 else return FalseExp
   evalExpr (Lower expr1 expr2) = do e1 <- evalExpr expr1
@@ -105,17 +111,25 @@ module Execute where
                                       (Const n1, Const n2) -> if (n1 < n2)
                                                               then return TrueExp
                                                               else return FalseExp
-
+                                      (Str s1, Str s2)     -> if (s1 < s2)
+                                                              then return TrueExp
+                                                              else return FalseExp
   evalExpr (GreaterEquals expr1 expr2) = do e1 <- evalExpr expr1
                                             e2 <- evalExpr expr2
                                             case (e1, e2) of
                                               (Const n1, Const n2) -> if (n1 >= n2)
                                                                       then return TrueExp
                                                                       else return FalseExp
+                                              (Str s1, Str s2)     -> if (s1 >= s2)
+                                                                      then return TrueExp
+                                                                      else return FalseExp
   evalExpr (LowerEquals expr1 expr2) = do e1 <- evalExpr expr1
                                           e2 <- evalExpr expr2
                                           case (e1, e2) of
                                             (Const n1, Const n2) -> if (n1 <= n2)
+                                                                    then return TrueExp
+                                                                    else return FalseExp
+                                            (Str s1, Str s2)     -> if (s1 <= s2)
                                                                     then return TrueExp
                                                                     else return FalseExp
   evalExpr (Negate expr) = do e <- evalExpr expr
@@ -125,6 +139,13 @@ module Execute where
                                     e2 <- evalExpr expr2
                                     case (e1, e2) of
                                       (Const n1, Const n2) -> return (Const (n1 + n2))
+                                      (Str s1, Str s2) -> return (Str (s1 ++ s2))
+                                      (Str s, Const n) -> return (Str (s ++ (showConst n)))
+                                      (Const n, Str s) -> return (Str ((showConst n) ++ s))
+                                      (Str s, TrueExp) -> return (Str (s ++ "true"))
+                                      (Str s, FalseExp)-> return (Str (s ++ "false"))
+                                      (TrueExp, Str s) -> return (Str ("true" ++ s))
+                                      (FalseExp, Str s)-> return (Str ("false" ++ s))
   evalExpr (Minus expr1 expr2) = do e1 <- evalExpr expr1
                                     e2 <- evalExpr expr2
                                     case (e1, e2) of
@@ -153,14 +174,41 @@ module Execute where
                                     e2 <- evalExpr expr2
                                     s  <- get
                                     case (e1, e2) of
-                                      (Str msg, Const chat) -> do reply <- sendMessage' (tokenBot s) (truncate chat) msg
+                                      (Str msg, Const chat) -> do reply <- sendMessage' (tokenBot s) (truncate chat) (unescape msg)
                                                                   case parseJSON (cs reply) of
                                                                     Ok r        -> return r
                                                                     Failed err  -> raise err
-                                      (Const n, Const chat) -> do reply <- sendMessage' (tokenBot s) (truncate chat) (show n)
+                                      (Const n, Const chat) -> do reply <- sendMessage' (tokenBot s) (truncate chat) (showConst n)
                                                                   case parseJSON (cs reply) of
                                                                     Ok r        -> return r
                                                                     Failed err  -> raise err
+                                      (TrueExp, Const chat) -> do reply <- sendMessage' (tokenBot s) (truncate chat) "true"
+                                                                  case parseJSON (cs reply) of
+                                                                    Ok r        -> return r
+                                                                    Failed err  -> raise err
+                                      (FalseExp, Const chat) -> do reply <- sendMessage' (tokenBot s) (truncate chat) "false"
+                                                                   case parseJSON (cs reply) of
+                                                                     Ok r        -> return r
+                                                                     Failed err  -> raise err
                                       (Str _, Str ('@':_))  -> raise "Not implemented"
-                                      _                     -> raise "Not implemented"
-  evalExpr _ = raise "Not implemented"
+                                      _                     -> raise "Not implemented" -- TODO implement posts to any url
+  evalExpr (Get expr) = do  e <- evalExpr expr
+                            case e of
+                              Str s   -> do reply <- liftIO $ C.get s
+                                            case parseJSON (cs reply) of
+                                              Ok r        -> return r
+                                              Failed err  -> raise err
+
+  unescape :: String -> String
+  unescape [] = []
+  unescape ('\\':(x:xs)) = case x of
+                            '\\' -> '\\' : unescape xs
+                            'r'  -> '\r' : unescape xs
+                            't'  -> '\t' : unescape xs
+                            'n'  -> '\n' : unescape xs
+                            '\'' -> '\'' : unescape xs
+                            _    -> x : unescape xs
+  unescape (x:xs) = x : unescape xs
+
+  showConst :: Double -> String
+  showConst n = if fromIntegral (truncate n) < n then show n else show (truncate n)

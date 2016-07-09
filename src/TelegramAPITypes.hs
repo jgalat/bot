@@ -81,8 +81,9 @@ module TelegramAPITypes where
     parseJSON _           = mzero
 
   data SimpleMessage = SimpleMessage {  to  :: Int,
-                                        msg :: String
+                                        msg :: String,
+                                        pm  :: String
                                       } deriving Show
 
   instance ToJSON SimpleMessage where
-     toJSON (SimpleMessage to msg)  = object ["chat_id" .= to, "text" .= msg]
+     toJSON (SimpleMessage to msg pm)  = object ["chat_id" .= to, "text" .= msg, "parse_mode" .= pm]

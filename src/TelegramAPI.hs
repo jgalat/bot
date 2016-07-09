@@ -27,9 +27,9 @@ module TelegramAPI
   getUpdates token offset = decode <$> liftIO (get $ apiURL ++ token ++ "/getUpdates?offset=" ++ show offset)
 
   sendMessage :: (MonadIO m) => String -> Int -> String -> m (Maybe Reply)
-  sendMessage token to msg =  let json = encode SimpleMessage {to = to, msg = msg}
+  sendMessage token to msg =  let json = encode SimpleMessage {to = to, msg = msg, pm = "Markdown"}
                               in  decode <$> liftIO (post (apiURL ++ token ++ "/sendMessage") json)
 
   sendMessage' :: (MonadIO m) => String -> Int -> String -> m (ByteString)
-  sendMessage' token to msg = let json = encode SimpleMessage {to = to, msg = msg}
+  sendMessage' token to msg = let json = encode SimpleMessage {to = to, msg = msg, pm = "Markdown"}
                               in liftIO (post (apiURL ++ token ++ "/sendMessage") json)

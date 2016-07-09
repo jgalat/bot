@@ -137,6 +137,11 @@ module Check where
                                 (Undefined, _)    -> return Number
                                 (_, Undefined)    -> return Number
                                 (Number, Number)  -> return Number
+                                (String, String)  -> return String
+                                (String, Number)  -> return String
+                                (Number, String)  -> return String
+                                (Bool, String)    -> return String
+                                (String, Bool)    -> return String
                                 _                 -> raise "Error" -- TODO
   inferExpr (Minus n0 n1) = do  t0 <- inferExpr n0
                                 t1 <- inferExpr n1
@@ -179,6 +184,7 @@ module Check where
                                 (JSON, String)    -> return JSON
                                 (String, Number)  -> return JSON
                                 (Number, Number)  -> return JSON
+                                (Bool, Number)    -> return JSON
                                 _                 -> raise "Error" -- TODO
   inferExpr (JsonObject o) =  let l = map snd $ envToList o
                               in do mapM_ inferExpr l
