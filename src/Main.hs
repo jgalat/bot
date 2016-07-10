@@ -45,11 +45,11 @@ module Main where
                                                                           in do putStrLn $ file ++ ": No se pudo abrir el archivo. " ++ err
                                                                                 return "")
                         case content of
-                          ""  ->  return ("", Comm initEnv [] [])
+                          ""  ->  return ("", Comm [] [])
                           _   ->  case parseCommand content of
                                     Ok comm     -> return (name, comm)
                                     Failed str  -> do liftIO $ putStrLn (file ++ ": " ++ str)
-                                                      return ("", Comm initEnv [] [])
+                                                      return ("", Comm [] [])
                      where
                        name'  = fst $ span (/='/') $ reverse file
                        name   = fst $ span (/='.') $ reverse name'

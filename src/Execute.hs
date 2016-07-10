@@ -13,16 +13,15 @@ module Execute where
   import qualified Communication as C
   import State (ExecState (..))
   import Parser
+  import PrettyPrint
 
 
   execute :: [Expr] -> ExecState -> Comm -> IO (Either String ())
-  execute args st (Comm e prmt c) = case cmpArgs args (map snd prmt) of
-                                      Left err  -> return (Left err)
-                                      _         -> let  envEx   = envFromList $ zip (map fst prmt) args
-                                                        execSt  = st {  exprEnv = envUnion (exprEnv st) envEx,
-                                                                        typeEnv = envUnion (typeEnv st) (envFromList prmt)
-                                                                     }
-                                                   in   runExecution (evalComms c) execSt
+  execute args st (Comm prmt c) = case cmpArgs args (map snd prmt) of
+                                    Left err  -> return (Left err)
+                                    _         -> let  envEx   = envFromList $ zip (map fst prmt) args
+                                                      execSt  = st { exprEnv = envUnion (exprEnv st) envEx }
+                                                 in   runExecution (evalComms c) execSt
 
   cmpArgs :: [Expr] -> [Type] -> Either String ()
   cmpArgs [] [] = Right ()
@@ -39,7 +38,6 @@ module Execute where
   evalComms :: [Statement] -> Execution ()
   evalComms = mapM_ evalComm
 
-  -- We still have to update all undefined types
   evalComm :: Statement -> Execution ()
   evalComm (Declaration var expr) = do  e <- evalExpr expr
                                         s <- get
@@ -67,10 +65,6 @@ module Execute where
                                   FalseExp  -> return ()
 
   evalExpr :: Expr -> Execution Expr
-  evalExpr TrueExp = return TrueExp
-  evalExpr FalseExp = return FalseExp
-  evalExpr (Const n) = return (Const n)
-  evalExpr (Str s) = return (Str s)
   evalExpr (Var v) = do s <- get
                         return (lookUp' v (exprEnv s))
   evalExpr (Not expr) = do  e <- evalExpr expr
@@ -140,12 +134,8 @@ module Execute where
                                     case (e1, e2) of
                                       (Const n1, Const n2) -> return (Const (n1 + n2))
                                       (Str s1, Str s2) -> return (Str (s1 ++ s2))
-                                      (Str s, Const n) -> return (Str (s ++ (showConst n)))
-                                      (Const n, Str s) -> return (Str ((showConst n) ++ s))
-                                      (Str s, TrueExp) -> return (Str (s ++ "true"))
-                                      (Str s, FalseExp)-> return (Str (s ++ "false"))
-                                      (TrueExp, Str s) -> return (Str ("true" ++ s))
-                                      (FalseExp, Str s)-> return (Str ("false" ++ s))
+                                      (Str s, _) -> return (Str (s ++ (showExpr e2)))
+                                      (_, Str s) -> return (Str ((showExpr e1) ++ s))
   evalExpr (Minus expr1 expr2) = do e1 <- evalExpr expr1
                                     e2 <- evalExpr expr2
                                     case (e1, e2) of
@@ -175,40 +165,23 @@ module Execute where
                                     s  <- get
                                     case (e1, e2) of
                                       (Str msg, Const chat) -> do reply <- sendMessage' (tokenBot s) (truncate chat) (unescape msg)
+                                                                  case parseJSON (unescape $ cs reply) of
+                                                                    Ok r        -> return r
+                                                                    Failed err  -> raise err
+                                      (_, Const chat)       -> do reply <- sendMessage' (tokenBot s) (truncate chat) (showExpr e1)
                                                                   case parseJSON (cs reply) of
                                                                     Ok r        -> return r
                                                                     Failed err  -> raise err
-                                      (Const n, Const chat) -> do reply <- sendMessage' (tokenBot s) (truncate chat) (showConst n)
-                                                                  case parseJSON (cs reply) of
-                                                                    Ok r        -> return r
-                                                                    Failed err  -> raise err
-                                      (TrueExp, Const chat) -> do reply <- sendMessage' (tokenBot s) (truncate chat) "true"
-                                                                  case parseJSON (cs reply) of
-                                                                    Ok r        -> return r
-                                                                    Failed err  -> raise err
-                                      (FalseExp, Const chat) -> do reply <- sendMessage' (tokenBot s) (truncate chat) "false"
-                                                                   case parseJSON (cs reply) of
-                                                                     Ok r        -> return r
-                                                                     Failed err  -> raise err
                                       (Str _, Str ('@':_))  -> raise "Not implemented"
-                                      _                     -> raise "Not implemented" -- TODO implement posts to any url
+                                      (_, Str url)          -> do reply <- liftIO $ C.post url (cs $ showExpr e1) -- TODO Test it well
+                                                                  case parseJSON (cs reply) of
+                                                                    Ok r        -> return r
+                                                                    Failed err  -> raise err
+                                      _                     -> raise "Not implemented"
   evalExpr (Get expr) = do  e <- evalExpr expr
                             case e of
                               Str s   -> do reply <- liftIO $ C.get s
                                             case parseJSON (cs reply) of
                                               Ok r        -> return r
                                               Failed err  -> raise err
-
-  unescape :: String -> String
-  unescape [] = []
-  unescape ('\\':(x:xs)) = case x of
-                            '\\' -> '\\' : unescape xs
-                            'r'  -> '\r' : unescape xs
-                            't'  -> '\t' : unescape xs
-                            'n'  -> '\n' : unescape xs
-                            '\'' -> '\'' : unescape xs
-                            _    -> x : unescape xs
-  unescape (x:xs) = x : unescape xs
-
-  showConst :: Double -> String
-  showConst n = if fromIntegral (truncate n) < n then show n else show (truncate n)
+  evalExpr x = return x

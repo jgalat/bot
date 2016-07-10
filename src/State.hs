@@ -17,13 +17,11 @@ module State where
                             token           = ""
                           }
 
-  data ExecState = ExecState  { typeEnv :: Env Type,
-                                exprEnv :: Env Expr,
+  data ExecState = ExecState  { exprEnv :: Env Expr,
                                 tokenBot:: String
                               }
 
   initExecState :: Int -> String -> ExecState
-  initExecState chat token = ExecState  { typeEnv = envFromList initTypeEnvList,
-                                          exprEnv = envFromList [("chat", Const (fromIntegral chat)), ("_", Const 0)],
+  initExecState chat token = ExecState  { exprEnv = envFromList [("chat", Const (fromIntegral chat)), ("_", Const 0)],
                                           tokenBot = token
                                         }

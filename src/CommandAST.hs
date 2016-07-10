@@ -5,7 +5,7 @@ module CommandAST where
 
   type Var = String
 
-  data Comm = Comm (Env Type) [(Var, Type)] [Statement]
+  data Comm = Comm [(Var, Type)] [Statement]
             deriving Show
 
   data Type = Undefined
@@ -23,7 +23,8 @@ module CommandAST where
                   | Do [Statement] Expr
                   deriving Show
 
-  data Expr = TrueExp
+  data Expr = Null
+            | TrueExp
             | FalseExp
             | Var Var
             | Const Double

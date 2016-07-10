@@ -31,6 +31,7 @@ import CommandAST
     '}'         { TBracesClose }
     TRUE        { TTrue }
     FALSE       { TFalse }
+    NULL        { TNull }
     '~'         { TNot }
     '&'         { TAnd }
     '|'         { TOr }
@@ -75,7 +76,7 @@ import CommandAST
 %%
 
 command :: { Comm }
-        : COMMAND '(' parameters ')' ':' stmts '.'  { Comm M.empty $3 $6 }
+        : COMMAND '(' parameters ')' ':' stmts '.'  { Comm $3 $6 }
 
 parameters    :: { [(Var, Type)] }
               : list_of_parameters                { $1 }
@@ -129,6 +130,7 @@ expr    :: { Expr }
 
 value   :: { Expr }
         : json                                    { $1 }
+        | NULL                                    { Null }
         | TRUE                                    { TrueExp }
         | FALSE                                   { FalseExp }
         | CONST                                   { Const $1 }
@@ -220,6 +222,7 @@ data Token  = TIdentifier Var
             | TSemiColon
             | TTrue
             | TFalse
+            | TNull
             | TNot
             | TAnd
             | TOr
@@ -286,24 +289,39 @@ lexAlpha cont s = case span (\c -> isAlpha c || isDigit c || c == '_' ) s  of
                     ("do", rest)       -> cont TDo rest
                     ("true", rest)     -> cont TTrue rest
                     ("false", rest)    -> cont TFalse rest
+                    ("null", rest)     -> cont TNull rest
                     ("Number", rest)   -> cont TTNumber rest
                     ("String", rest)   -> cont TTString rest
                     ("Bool", rest)     -> cont TTBool rest
                     (var, rest)        -> cont (TIdentifier var) rest
 
 lexString :: (Token -> P a) -> P a
-lexString cont s =  case span (/='\"') s of
-                      (string, rest)  ->  case tail' rest of
-                                            Just xs ->  cont (TString string) xs
-                                            Nothing ->  \line -> Failed $ "Línea " ++ show line ++ ": Falta caracter \'\"\'"
-                    where tail' []      = Nothing
-                          tail' (_:xs)  = Just xs
+lexString cont s =  let (string, rest) = getString [] s
+                    in case rest of
+                        []        -> \line -> Failed $ "Línea " ++ show line ++ ": Error parsing string \"" ++ string ++ "\""
+                        ('\"':xs) -> cont (TString string) xs
+                    where getString str [] = ("", [])
+                          getString str ('\"': xs) = (rev str, '\"':xs)
+                          getString str ('\\':(x:xs)) = case x of
+                                                          '\\' -> getString (x:str) xs
+                                                          '\"' -> getString (x:str) xs
+                                                          '\'' -> getString (x:str) xs
+                                                          '/'  -> getString (x:str) xs
+                                                          'n'  -> getString ('\n':str) xs
+                                                          't'  -> getString ('\t':str) xs
+                                                          'r'  -> getString ('\r':str) xs
+                                                          _    -> (str, [])
+                          getString str (x:xs) = getString (x:str) xs
+                          rev []     = []
+                          rev (x:xs) = rev' [x] xs
+                          rev' s []     = s
+                          rev' s (x:xs) = rev' (x:s) xs
 
 lexNumber :: (Token -> P a) -> P a
 lexNumber cont s =  case span (\x -> isDigit x || x == '.') s of
                       (number, rest)  ->  if (length $ filter (=='.') number) <= 1
                                           then cont (TConst (read number)) rest
-                                          else \line -> Failed $ "Línea " ++ show line ++ ": Número..."
+                                          else \line -> Failed $ "Línea " ++ show line ++ ": Error parsing number \"" ++ number ++ "\""
 
 parseCommand s = parse_command s 1
 parseJSON s = parse_json s 1

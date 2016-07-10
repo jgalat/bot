@@ -11,10 +11,10 @@ module Check where
   import Monads (Check, runChecker, raise)
 
   check :: Comm -> Either String Comm
-  check (Comm _ p c)  = let s = envFromList $ initTypeEnvList ++ p
-                        in case runChecker (checkStmts c) s of
-                            (Left err, _) -> Left err
-                            (Right _, s)  -> Right (Comm s p c)
+  check (Comm p c)  = let s = envFromList $ initTypeEnvList ++ p
+                      in case runChecker (checkStmts c) s of
+                          (Left err, _) -> Left err
+                          (Right _, _)  -> Right (Comm p c)
 
   checkStmts :: (Monad m, MonadError String m, MonadState (Env Type) m) => [Statement] -> m ()
   checkStmts = mapM_ checkStmt
@@ -66,6 +66,7 @@ module Check where
   inferExpr :: (Monad m, MonadError String m, MonadState (Env Type) m) => Expr -> m Type
   inferExpr TrueExp = return Bool
   inferExpr FalseExp = return Bool
+  inferExpr Null     = return Undefined
   inferExpr (Var var) = do  s <- get
                             case lookUp var s of
                               Just t  -> return t
@@ -185,6 +186,7 @@ module Check where
                                 (String, Number)  -> return JSON
                                 (Number, Number)  -> return JSON
                                 (Bool, Number)    -> return JSON
+                                (JSON, Number)    -> return JSON
                                 _                 -> raise "Error" -- TODO
   inferExpr (JsonObject o) =  let l = map snd $ envToList o
                               in do mapM_ inferExpr l
