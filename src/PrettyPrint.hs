@@ -19,6 +19,7 @@ module PrettyPrint where
   showConst n = if fromIntegral (truncate n) < n then show n else show (truncate n)
 
   showExpr :: Expr -> String
+  showExpr Null           = "null"
   showExpr (Const n)      = showConst n
   showExpr (TrueExp)      = "true"
   showExpr (FalseExp)     = "false"

@@ -1,5 +1,7 @@
 module State where
 
+  import Network.HTTP.Conduit (Manager)
+
   import Environment
   import CommandAST
 
@@ -8,20 +10,24 @@ module State where
 
   data BotState = BotState  { activeCommands  :: Env Comm,
                               updateId        :: Int,
-                              token           :: String
+                              token           :: String,
+                              manager         :: Manager
                             }
 
-  initBotState :: BotState
-  initBotState = BotState { activeCommands  = initEnv,
-                            updateId        = 0,
-                            token           = ""
-                          }
+  initBotState :: Manager -> BotState
+  initBotState m = BotState { activeCommands  = initEnv,
+                              updateId        = 0,
+                              token           = "",
+                              manager         = m
+                            }
 
-  data ExecState = ExecState  { exprEnv :: Env Expr,
-                                tokenBot:: String
+  data ExecState = ExecState  { exprEnv     :: Env Expr,
+                                tokenBot    :: String,
+                                managerBot  :: Manager
                               }
 
-  initExecState :: Int -> String -> ExecState
-  initExecState chat token = ExecState  { exprEnv = envFromList [("chat", Const (fromIntegral chat)), ("_", Const 0)],
-                                          tokenBot = token
-                                        }
+  initExecState :: Manager -> Int -> String -> ExecState
+  initExecState m chat token = ExecState  { exprEnv = envFromList [("chat", Const (fromIntegral chat)), ("_", Const 0)],
+                                            tokenBot = token,
+                                            managerBot = m
+                                          }

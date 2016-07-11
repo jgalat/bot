@@ -16,7 +16,7 @@ module Bot where
 
   echoBot :: Bot ()
   echoBot = do  s     <- get
-                reply <- getUpdates (token s) (updateId s)
+                reply <- getUpdates (manager s) (token s) (updateId s)
                 case reply of
                   Nothing   -> raise "Error Parsing!"
                   Just rep  -> case ok rep of
@@ -24,14 +24,14 @@ module Bot where
                                           []  -> (liftIO $ putStrLn "No Updates...") >> echoBot
                                           xs  -> do (liftIO $ putStrLn "New Updates!")
                                                     mapM_ (\x -> do liftIO $ putStrLn "Replying..."
-                                                                    sendMessage (token s) (chat_id $ chat $ message x) (maybe "(null)" id $ text $ message x)) xs
+                                                                    sendMessage (manager s) (token s) (chat_id $ chat $ message x) (maybe "(null)" id $ text $ message x)) xs
                                                     liftM Right $ put (s { updateId = (update_id (last xs) + 1) })
                                                     echoBot
                                 _    -> echoBot
 
   mainBot :: Bot ()
   mainBot = do  s     <- get
-                reply <- getUpdates (token s) (updateId s)
+                reply <- getUpdates (manager s) (token s) (updateId s)
                 case reply of
                   Nothing   -> raise "Error Parsing!"
                   Just rep  -> case ok rep of
@@ -46,7 +46,7 @@ module Bot where
                                                                                           _    -> False) parsedRequests
                                                     in  do  execs <- mapM (\(ch,(r,ar)) ->
                                                                                 case lookUp r (activeCommands s) of
-                                                                                  Just cmd -> do  exec <- liftIO $ execute ar (initExecState ch (token s)) cmd
+                                                                                  Just cmd -> do  exec <- liftIO $ execute ar (initExecState (manager s) ch (token s)) cmd
                                                                                                   case exec of
                                                                                                     Left err -> return (Left (r ++": "++err))
                                                                                                     _        -> return exec

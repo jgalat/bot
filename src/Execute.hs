@@ -164,23 +164,24 @@ module Execute where
                                     e2 <- evalExpr expr2
                                     s  <- get
                                     case (e1, e2) of
-                                      (Str msg, Const chat) -> do reply <- sendMessage' (tokenBot s) (truncate chat) (unescape msg)
+                                      (Str msg, Const chat) -> do reply <- sendMessage' (managerBot s) (tokenBot s) (truncate chat) (unescape msg)
                                                                   case parseJSON (unescape $ cs reply) of
                                                                     Ok r        -> return r
                                                                     Failed err  -> raise err
-                                      (_, Const chat)       -> do reply <- sendMessage' (tokenBot s) (truncate chat) (showExpr e1)
+                                      (_, Const chat)       -> do reply <- sendMessage' (managerBot s) (tokenBot s) (truncate chat) (showExpr e1)
                                                                   case parseJSON (cs reply) of
                                                                     Ok r        -> return r
                                                                     Failed err  -> raise err
                                       (Str _, Str ('@':_))  -> raise "Not implemented"
-                                      (_, Str url)          -> do reply <- liftIO $ C.post url (cs $ showExpr e1) -- TODO Test it well
+                                      (_, Str url)          -> do reply <- liftIO $ C.post (managerBot s) url (cs $ showExpr e1) -- TODO Test it well
                                                                   case parseJSON (cs reply) of
                                                                     Ok r        -> return r
                                                                     Failed err  -> raise err
                                       _                     -> raise "Not implemented"
-  evalExpr (Get expr) = do  e <- evalExpr expr
+  evalExpr (Get expr) = do  s <- get
+                            e <- evalExpr expr
                             case e of
-                              Str s   -> do reply <- liftIO $ C.get s
+                              Str str -> do reply <- liftIO $ C.get (managerBot s) str
                                             case parseJSON (cs reply) of
                                               Ok r        -> return r
                                               Failed err  -> raise err

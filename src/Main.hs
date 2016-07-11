@@ -13,16 +13,18 @@ module Main where
   import Bot (mainBot, echoBot)
   import Monads (runBot, Bot)
   import State (BotState (..), initBotState)
+  import Communication (managertls)
   import Keys
 
   main :: IO ()
   main = do putStrLn "Saluton Mondo"
             args <- getArgs
+            m    <- managertls
             case args of
               []      -> do putStrLn "Repeating everything..."
-                            r <- runBot echoBot $ initBotState { token = tokenBot }
+                            r <- runBot echoBot $ (initBotState m) { token = tokenBot }
                             case r of
-                              Left err -> putStrLn "Error" -- TODO
+                              Left err -> putStrLn err -- TODO
                               _        -> return ()
               files   -> do parsed <- mapM compileFile files
                             let parsedOk  = filter ((/="") . fst) parsed
@@ -33,10 +35,10 @@ module Main where
                             mapM_ (\(n, Left err) -> putStrLn $ n ++ ": " ++ err) failed
                             mapM_ (\(n, _) -> putStrLn $ n ++ ": Ok") successful
                             let activeComms = envFromList $ map (\(n, Right c) -> (n, c)) successful
-                            r <- runBot mainBot $ initBotState {  activeCommands  = activeComms,
-                                                                  token           = tokenBot }
+                            r <- runBot mainBot $ (initBotState m) {  activeCommands  = activeComms,
+                                                                      token           = tokenBot }
                             case r of
-                              Left err -> putStrLn "Error" -- TODO
+                              Left err -> putStrLn err -- TODO
                               _        -> return ()
 
 

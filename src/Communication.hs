@@ -3,7 +3,8 @@
 module Communication
         (
           get,
-          post
+          post,
+          managertls
         ) where
 
   import Network.HTTP.Conduit
@@ -11,24 +12,21 @@ module Communication
   import Data.ByteString.Lazy
   import Control.Exception
 
-  manager :: IO Manager
-  manager =  newManager tlsManagerSettings
+  managertls :: IO Manager
+  managertls =  newManager tlsManagerSettings
 
   handleError :: HttpException -> IO ByteString
   handleError (StatusCodeException _ l _) = return (maybe "" fromStrict (lookup "X-Response-Body-Start" l))
   handleError _                           = return "" -- TODO
 
-  get :: String -> IO ByteString
-  get url = do  request   <- parseUrl url
-                m         <- manager
-                (responseBody <$> httpLbs request m) `catch` handleError
+  get :: Manager -> String ->IO ByteString
+  get m url = do  request   <- parseUrl url
+                  (responseBody <$> httpLbs request m) `catch` handleError
 
-
-  post :: String -> ByteString -> IO ByteString
-  post url body = do  r     <- parseUrl url
-                      let request   = r { method = "POST",
-                                          requestHeaders = [("Content-Type", "application/json")],
-                                          requestBody = RequestBodyLBS body
-                                        }
-                      m     <- manager
-                      (responseBody <$> httpLbs request m) `catch` handleError
+  post :: Manager -> String -> ByteString -> IO ByteString
+  post m url body = do  r     <- parseUrl url
+                        let request   = r { method = "POST",
+                                            requestHeaders = [("Content-Type", "application/json")],
+                                            requestBody = RequestBodyLBS body
+                                          }
+                        (responseBody <$> httpLbs request m) `catch` handleError
