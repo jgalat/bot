@@ -6,29 +6,24 @@ command(Number i):
 
   if (i == 1):
     episode = "IV"
-  .
+
   if (i == 2):
     episode = "V"
-  .
+
   if (i == 3):
     episode = "VI"
-  .
+
   if (i == 4):
     episode = "I"
-  .
+
   if (i == 5):
     episode = "II"
-  .
+
   if (i == 6):
     episode = "III"
-  .
+
   if (i == 7):
     episode = "VII"
-  .
 
   if ((i <= 7) & (i > 0)):
-    _ = ( "*" + "Episode " + episode + "*\n"
-        + "*" + (rep ! "title") + "*\n\n"
-        + (rep ! "opening_crawl")) >> chat
-  .
-.
+    _ = ( "*" + "Episode " + episode + "*\n" + "*" + (rep ! "title") + "*\n\n" + (rep ! "opening_crawl")) >> chat

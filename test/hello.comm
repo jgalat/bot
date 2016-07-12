@@ -1,3 +1,2 @@
 command ():
   _ = "Hello World" >> chat
-.

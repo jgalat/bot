@@ -2,14 +2,12 @@
 module Parser where
 
 import Data.Char
-import Control.Exception (catch)
 import qualified Data.Map as M
 
 import CommandAST
-
 }
 
-%monad { P } { thenP } { returnP }
+%monad { P } { pThen } { pReturn }
 
 %name parse_command command
 %name parse_json json
@@ -21,7 +19,6 @@ import CommandAST
 %token
     ':'         { TColon }
     ';'         { TSemiColon}
-    '.'         { TDot }
     ','         { TComma }
     '('         { TParenthesesOpen }
     ')'         { TParenthesesClose }
@@ -48,6 +45,8 @@ import CommandAST
     '<<'        { TGet }
     '>>'        { TPost }
     '!'         { TExclamation }
+    IDENT       { TIdent }
+    DEDENT      { TDedent }
     STRING      { TString $$ }
     IDENTIFIER  { TIdentifier $$ }
     CONST       { TConst $$ }
@@ -76,7 +75,7 @@ import CommandAST
 %%
 
 command :: { Comm }
-        : COMMAND '(' parameters ')' ':' stmts '.'  { Comm $3 $6 }
+        : COMMAND '(' parameters ')' ':' IDENT stmts DEDENT { Comm $3 $7 }
 
 parameters    :: { [(Var, Type)] }
               : list_of_parameters                { $1 }
@@ -100,12 +99,12 @@ stmts   :: { [Statement] }
         |                                         { [] }
 
 stmt    :: { Statement }
-        : VAR IDENTIFIER '=' expr                 { Declaration $2 $4 }
-        | IDENTIFIER '=' expr                     { Assign $1 $3 }
-        | IF expr ':' stmts '.'                   { If $2 $4 }
-        | IF expr ':' stmts ELSE ':' stmts '.'    { IfElse $2 $4 $7 }
-        | WHILE expr ':' stmts '.'                { While $2 $4 }
-        | DO ':' stmts '.' WHILE expr             { Do $3 $6 }
+        : VAR IDENTIFIER '=' expr                                     { Declaration $2 $4 }
+        | IDENTIFIER '=' expr                                         { Assign $1 $3 }
+        | IF expr ':' IDENT stmts DEDENT                              { If $2 $5 }
+        | IF expr ':' IDENT stmts DEDENT ELSE ':' IDENT stmts DEDENT  { IfElse $2 $5 $10 }
+        | WHILE expr ':' IDENT stmts DEDENT                           { While $2 $5 }
+        | DO ':' IDENT stmts DEDENT WHILE expr                        { Do $4 $7 }
 
 expr    :: { Expr }
         : '(' expr ')'                            { $2 }
@@ -166,35 +165,35 @@ arguments :: { [Expr] }
           : value arguments                       { $1 : $2 }
           | IDENTIFIER arguments                  { Str $1 : $2}
           |                                       { [] }
-{
 
+{
 data ParseResult a = Ok a | Failed String
                      deriving Show
 
-type LineNumber = Int
-type P a = String -> LineNumber -> ParseResult a
+data ParseState = ParseState  { line        :: Int,
+                                identLevel  :: Int,
+                                levelStack  :: [Int]
+                              }
+                  deriving Show
 
-getLineNo :: P LineNumber
-getLineNo = \s l -> Ok l
+initParseState :: ParseState
+initParseState = ParseState { line = 1,
+                              identLevel = 0,
+                              levelStack = []
+                            }
 
-thenP :: P a -> (a -> P b) -> P b
-m `thenP` k = \s l-> case m s l of
-                         Ok a     -> k a s l
-                         Failed e -> Failed e
+type P a = String -> ParseState -> ParseResult a
 
-returnP :: a -> P a
-returnP a = \s l-> Ok a
+pReturn :: a -> P a
+pReturn x = \_ _ -> Ok x
 
-failP :: String -> P a
-failP err = \s l -> Failed err
-
-catchP :: P a -> (String -> P a) -> P a
-catchP m k = \s l -> case m s l of
-                        Ok a     -> Ok a
-                        Failed e -> k e s l
+pThen :: P a -> (a -> P b) -> P b
+m `pThen` f  = \s st -> case m s st of
+                          Ok a     -> f a s st
+                          Failed e -> Failed e
 
 happyError :: P a
-happyError = \ s i -> Failed $ "Línea "++(show (i::LineNumber))++": Error de parseo\n"++(s)
+happyError = \s st -> Failed $ "Line " ++ show (line st) ++ ": Error parsing\n" ++ s ++ "\n" ++ show st
 
 data Token  = TIdentifier Var
             | TConst Double
@@ -210,7 +209,6 @@ data Token  = TIdentifier Var
             | TTNumber
             | TTString
             | TTBool
-            | TDot
             | TComma
             | TParenthesesOpen
             | TParenthesesClose
@@ -238,13 +236,28 @@ data Token  = TIdentifier Var
             | TExclamation
             | TGet
             | TPost
+            | TIdent
+            | TDedent
             | TEOF
             deriving Show
 
-----------------------------------
+lexer :: (Token -> P a) -> P a
 lexer cont s = case s of
-                    []                          -> cont TEOF []
-                    ('\n':cs)                   ->  \line -> lexer cont cs (line + 1)
+                    []                          -> \st -> case levelStack st of
+                                                            []      -> cont TEOF [] st
+                                                            (x:xs)  -> cont TDedent [] (st { levelStack = xs })
+                    ('\n':('\n':cs))            -> lexer cont ('\n':cs)
+                    ('\n':cs)                   -> \st' ->  let st = st' { line = (line st') + 1 }
+                                                                (identation, input) = span (==' ') cs
+                                                                currIdent = length identation
+                                                                lastIdent = identLevel st
+                                                            in  if (currIdent > lastIdent)
+                                                                then cont TIdent input (st {  levelStack = lastIdent : levelStack st,
+                                                                                              identLevel = currIdent })
+                                                                else  if (currIdent < lastIdent)
+                                                                      then cont TDedent input (st { identLevel = head (levelStack st),
+                                                                                                    levelStack = tail (levelStack st) })
+                                                                      else lexer cont cs st
                     (c:cs)
                         | isSpace c             -> lexer cont cs
                         | isAlpha c || c == '_' -> lexAlpha cont s
@@ -267,7 +280,6 @@ lexer cont s = case s of
                     ('*':cs)                    -> cont TAsterisc cs
                     ('/':cs)                    -> cont TSlash cs
                     ('!':cs)                    -> cont TExclamation cs
-                    ('.':cs)                    -> cont TDot cs
                     (',':cs)                    -> cont TComma cs
                     ('(':cs)                    -> cont TParenthesesOpen cs
                     (')':cs)                    -> cont TParenthesesClose cs
@@ -277,7 +289,7 @@ lexer cont s = case s of
                     ('}':cs)                    -> cont TBracesClose cs
                     (':':cs)                    -> cont TColon cs
                     (';':cs)                    -> cont TSemiColon cs
-                    unknown                     -> \line -> Failed $ "Línea " ++ show line ++ ": No se puede reconocer " ++ (show $ take 10 unknown)++ "..."
+                    unknown                     -> \st -> Failed $ "Line " ++ show (line st) ++ ": Unrecognized " ++ (show $ take 10 unknown)++ "..."
 
 lexAlpha :: (Token -> P a) -> P a
 lexAlpha cont s = case span (\c -> isAlpha c || isDigit c || c == '_' ) s  of
@@ -298,7 +310,7 @@ lexAlpha cont s = case span (\c -> isAlpha c || isDigit c || c == '_' ) s  of
 lexString :: (Token -> P a) -> P a
 lexString cont s =  let (string, rest) = getString [] s
                     in case rest of
-                        []        -> \line -> Failed $ "Línea " ++ show line ++ ": Error parsing string \"" ++ string ++ "\""
+                        []        -> \st -> Failed $ "Line " ++ show (line st) ++ ": Error parsing string \"" ++ string ++ "\""
                         ('\"':xs) -> cont (TString string) xs
                     where getString str [] = ("", [])
                           getString str ('\"': xs) = (rev str, '\"':xs)
@@ -321,9 +333,9 @@ lexNumber :: (Token -> P a) -> P a
 lexNumber cont s =  case span (\x -> isDigit x || x == '.') s of
                       (number, rest)  ->  if (length $ filter (=='.') number) <= 1
                                           then cont (TConst (read number)) rest
-                                          else \line -> Failed $ "Línea " ++ show line ++ ": Error parsing number \"" ++ number ++ "\""
+                                          else \st -> Failed $ "Line " ++ show (line st) ++ ": Error parsing number \"" ++ number ++ "\""
 
-parseCommand s = parse_command s 1
-parseJSON s = parse_json s 1
-parseRequest s = parse_request s 1
+parseCommand s = parse_command s initParseState
+parseJSON s = parse_json s initParseState
+parseRequest s = parse_request s initParseState
 }

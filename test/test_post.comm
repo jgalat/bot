@@ -5,4 +5,3 @@ command():
   _ = "*bold* \n _italic_ \n [URL](http://www.google.com) \n `code`" >> chat
   _ = {"array" : [1, 2, 3], "object" : {"b" : true}, "int" : 1, "string" : "string1 \n \t \"string2 \"", "bool": true} >> chat
   _ = [1, 2, 3] >> chat
-.
