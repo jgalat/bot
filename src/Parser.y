@@ -251,13 +251,15 @@ lexer cont s = case s of
                                                                 (identation, input) = span (==' ') cs
                                                                 currIdent = length identation
                                                                 lastIdent = identLevel st
-                                                            in  if (currIdent > lastIdent)
-                                                                then cont TIdent input (st {  levelStack = lastIdent : levelStack st,
-                                                                                              identLevel = currIdent })
-                                                                else  if (currIdent < lastIdent)
-                                                                      then cont TDedent input (st { identLevel = head (levelStack st),
-                                                                                                    levelStack = tail (levelStack st) })
-                                                                      else lexer cont cs st
+                                                            in  case input of
+                                                                  ('-':('-': _)) -> lexer cont input st
+                                                                  _              -> if (currIdent > lastIdent)
+                                                                                    then cont TIdent input (st {  levelStack = lastIdent : levelStack st,
+                                                                                                                  identLevel = currIdent })
+                                                                                    else  if (currIdent < lastIdent)
+                                                                                          then cont TDedent input (st { identLevel = head (levelStack st),
+                                                                                                                        levelStack = tail (levelStack st) })
+                                                                                          else lexer cont cs st
                     (c:cs)
                         | isSpace c             -> lexer cont cs
                         | isAlpha c || c == '_' -> lexAlpha cont s
