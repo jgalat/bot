@@ -1,7 +1,7 @@
 module PrettyPrint where
 
+  import Map
   import CommandAST
-  import qualified Data.Map as M
 
   unescape :: String -> String
   unescape [] = []
@@ -24,8 +24,8 @@ module PrettyPrint where
   showExpr (TrueExp)      = "true"
   showExpr (FalseExp)     = "false"
   showExpr (Str s)        = '\"' : (s ++ "\"")
-  showExpr (JsonObject o) = showJsonObject (M.toList o)
-  showExpr (JsonArray a)  = showJsonArray a
+  showExpr (JsonObject o) = showJsonObject (mapToList o)
+  showExpr (Array a)      = showArray a
   showExpr _ = "WTF!"
 
   showJsonObject :: [(String, Expr)] -> String
@@ -34,8 +34,8 @@ module PrettyPrint where
                       where showJsonObject' [(k,e)]     = ("\"" ++ (k ++ "\" : ")) ++ showExpr e ++ "}"
                             showJsonObject' ((k,e) : es)= ("\"" ++ (k ++ "\" : ")) ++ showExpr e ++ ", " ++ showJsonObject' es
 
-  showJsonArray :: [Expr] -> String
-  showJsonArray []  = "[]"
-  showJsonArray xs  = "\\[" ++ showJsonArray' xs
-                      where showJsonArray' [e]    = showExpr e ++ "]"
-                            showJsonArray' (e:es) = showExpr e ++ ", " ++ showJsonArray' es
+  showArray :: [Expr] -> String
+  showArray []  = "[]"
+  showArray xs  = "\\[" ++ showArray' xs
+                  where showArray' [e]    = showExpr e ++ "]"
+                        showArray' (e:es) = showExpr e ++ ", " ++ showArray' es

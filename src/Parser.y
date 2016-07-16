@@ -2,7 +2,7 @@
 module Parser where
 
 import Data.Char
-import qualified Data.Map as M
+import Map
 
 import CommandAST
 }
@@ -56,6 +56,8 @@ import CommandAST
     ELSE        { TElse }
     WHILE       { TWhile }
     DO          { TDo }
+    FOR         { TFor }
+    IN          { TIn }
     TYPENUMBER  { TTNumber }
     TYPESTRING  { TTString }
     TYPEBOOL    { TTBool }
@@ -99,12 +101,12 @@ stmts   :: { [Statement] }
         |                                         { [] }
 
 stmt    :: { Statement }
-        : VAR IDENTIFIER '=' expr                                     { Declaration $2 $4 }
-        | IDENTIFIER '=' expr                                         { Assign $1 $3 }
+        : IDENTIFIER '=' expr                                         { Assign $1 $3 }
         | IF expr ':' IDENT stmts DEDENT                              { If $2 $5 }
         | IF expr ':' IDENT stmts DEDENT ELSE ':' IDENT stmts DEDENT  { IfElse $2 $5 $10 }
         | WHILE expr ':' IDENT stmts DEDENT                           { While $2 $5 }
         | DO ':' IDENT stmts DEDENT WHILE expr                        { Do $4 $7 }
+        | FOR IDENTIFIER IN expr ':' IDENT stmts DEDENT               { For $2 $4 $7 }
 
 expr    :: { Expr }
         : '(' expr ')'                            { $2 }
@@ -136,8 +138,8 @@ value   :: { Expr }
         | STRING                                  { Str $1 }
 
 json    :: { Expr }
-        : object                                  { JsonObject (M.fromList $1) }
-        | array                                   { JsonArray  $1 }
+        : object                                  { JsonObject (mapFromList $1) }
+        | array                                   { Array  $1 }
 
 object  :: { [(String, Expr)] }
         : '{' '}'                                 { [] }
@@ -205,6 +207,8 @@ data Token  = TIdentifier Var
             | TElse
             | TWhile
             | TDo
+            | TFor
+            | TIn
             | TType
             | TTNumber
             | TTString
@@ -301,6 +305,8 @@ lexAlpha cont s = case span (\c -> isAlpha c || isDigit c || c == '_' ) s  of
                     ("else", rest)     -> cont TElse rest
                     ("while", rest)    -> cont TWhile rest
                     ("do", rest)       -> cont TDo rest
+                    ("for", rest)      -> cont TFor rest
+                    ("in", rest)       -> cont TIn rest
                     ("true", rest)     -> cont TTrue rest
                     ("false", rest)    -> cont TFalse rest
                     ("null", rest)     -> cont TNull rest

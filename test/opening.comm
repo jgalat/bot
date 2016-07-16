@@ -1,8 +1,8 @@
 command(Number i):
 
-  var url = "http://swapi.co/api/films/" + i
-  var rep = << url
-  var episode = ""
+  url = "http://swapi.co/api/films/" + i
+  rep = << url
+  episode = ""
 
   if (i == 1):
     episode = "IV"

@@ -1,3 +1,3 @@
 command(Number i):
-  var pokemon = << "http://pokeapi.co/api/v2/pokemon/" + i
+  pokemon = << "http://pokeapi.co/api/v2/pokemon/" + i
   _ = "[" + (pokemon ! "name") + "](" + (pokemon ! "sprites") ! "front_default" + ")" >> chat

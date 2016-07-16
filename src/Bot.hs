@@ -7,7 +7,7 @@ module Bot where
   import Control.Monad.IO.Class
 
   import TelegramAPI
-  import Environment
+  import Map
   import CommandAST
   import Parser (ParseResult(..), parseRequest)
   import State (BotState (..), initExecState)

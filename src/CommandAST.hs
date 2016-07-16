@@ -1,26 +1,25 @@
 module CommandAST where
 
-  import Data.Map
-  import Environment
+  import Map
 
   type Var = String
 
   data Comm = Comm [(Var, Type)] [Statement]
             deriving Show
 
-  data Type = Undefined
+  data Type = ArrayType
             | Number
             | String
             | Bool
             | JSON
             deriving (Show, Eq)
 
-  data Statement  = Declaration Var Expr
-                  | Assign Var Expr
+  data Statement  = Assign Var Expr
                   | If Expr [Statement]
                   | IfElse Expr [Statement] [Statement]
                   | While Expr [Statement]
                   | Do [Statement] Expr
+                  | For Var Expr [Statement]
                   deriving Show
 
   data Expr = Null
@@ -45,6 +44,6 @@ module CommandAST where
             | Index Expr Expr
             | Get Expr
             | Post Expr Expr
-            | JsonObject (Map String Expr)
-            | JsonArray [Expr]
+            | JsonObject (Map Expr)
+            | Array [Expr]
             deriving Show

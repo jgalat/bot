@@ -7,17 +7,17 @@ module Monads where
   import Control.Monad.State
   import Control.Monad.Except
 
-  import CommandAST (Type, Expr)
-  import Environment
+  import CommandAST (Expr)
+  import Map
   import State (BotState, ExecState)
 
   raise :: (Monad m, MonadError String m) => String -> m a
   raise = throwError
 
-  type Check a = ExceptT String (State (Env Type)) a
+  type Check a = ExceptT String (State (Map ())) a
 
-  runChecker :: Check a -> Env Type -> (Either String a, Env Type)
-  runChecker c s = runState (runExceptT c) s
+  runChecker :: Check a -> Map () -> Either String a
+  runChecker c s = fst (runState (runExceptT c) s)
 
   type Bot a = ExceptT String (StateT BotState IO) a
 

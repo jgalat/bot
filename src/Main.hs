@@ -6,7 +6,7 @@ module Main where
   import Control.Exception (catch, IOException)
   import Data.List
 
-  import Environment
+  import Map
   import CommandAST (Comm (..))
   import Parser (parseCommand, ParseResult (..))
   import Check (check)
@@ -34,7 +34,7 @@ module Main where
                                                                                 _       -> False) checked
                             mapM_ (\(n, Left err) -> putStrLn $ n ++ ": " ++ err) failed
                             mapM_ (\(n, _) -> putStrLn $ n ++ ": Ok") successful
-                            let activeComms = envFromList $ map (\(n, Right c) -> (n, c)) successful
+                            let activeComms = mapFromList $ map (\(n, Right c) -> (n, c)) successful
                             r <- runBot mainBot $ (initBotState m) {  activeCommands  = activeComms,
                                                                       token           = tokenBot }
                             case r of
