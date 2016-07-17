@@ -101,50 +101,50 @@ module Execute where
   evalExpr (Equals expr1 expr2) = do  e1 <- evalExpr expr1
                                       e2 <- evalExpr expr2
                                       case (e1, e2) of
-                                        (Const n1, Const n2) -> if (n1 == n2)
+                                        (Const n1, Const n2) -> if n1 == n2
                                                                 then return TrueExp
                                                                 else return FalseExp
-                                        (Str s1, Str s2)     -> if (s1 == s2)
+                                        (Str s1, Str s2)     -> if s1 == s2
                                                                 then return TrueExp
                                                                 else return FalseExp
                                         _                    -> raise "Runtime error" -- TODO
   evalExpr (Greater expr1 expr2) = do e1 <- evalExpr expr1
                                       e2 <- evalExpr expr2
                                       case (e1, e2) of
-                                        (Const n1, Const n2) -> if (n1 > n2)
+                                        (Const n1, Const n2) -> if n1 > n2
                                                                 then return TrueExp
                                                                 else return FalseExp
-                                        (Str s1, Str s2)     -> if (s1 > s2)
+                                        (Str s1, Str s2)     -> if s1 > s2
                                                                 then return TrueExp
                                                                 else return FalseExp
                                         _                    -> raise "Runtime error" -- TODO
   evalExpr (Lower expr1 expr2) = do e1 <- evalExpr expr1
                                     e2 <- evalExpr expr2
                                     case (e1, e2) of
-                                      (Const n1, Const n2) -> if (n1 < n2)
+                                      (Const n1, Const n2) -> if n1 < n2
                                                               then return TrueExp
                                                               else return FalseExp
-                                      (Str s1, Str s2)     -> if (s1 < s2)
+                                      (Str s1, Str s2)     -> if s1 < s2
                                                               then return TrueExp
                                                               else return FalseExp
                                       _                    -> raise "Runtime error" -- TODO
   evalExpr (GreaterEquals expr1 expr2) = do e1 <- evalExpr expr1
                                             e2 <- evalExpr expr2
                                             case (e1, e2) of
-                                              (Const n1, Const n2) -> if (n1 >= n2)
+                                              (Const n1, Const n2) -> if n1 >= n2
                                                                       then return TrueExp
                                                                       else return FalseExp
-                                              (Str s1, Str s2)     -> if (s1 >= s2)
+                                              (Str s1, Str s2)     -> if s1 >= s2
                                                                       then return TrueExp
                                                                       else return FalseExp
                                               _                    -> raise "Runtime error" -- TODO
   evalExpr (LowerEquals expr1 expr2) = do e1 <- evalExpr expr1
                                           e2 <- evalExpr expr2
                                           case (e1, e2) of
-                                            (Const n1, Const n2) -> if (n1 <= n2)
+                                            (Const n1, Const n2) -> if n1 <= n2
                                                                     then return TrueExp
                                                                     else return FalseExp
-                                            (Str s1, Str s2)     -> if (s1 <= s2)
+                                            (Str s1, Str s2)     -> if s1 <= s2
                                                                     then return TrueExp
                                                                     else return FalseExp
                                             _                    -> raise "Runtime error" -- TODO
@@ -157,8 +157,8 @@ module Execute where
                                     case (e1, e2) of
                                       (Const n1, Const n2)  -> return (Const (n1 + n2))
                                       (Str s1, Str s2)      -> return (Str (s1 ++ s2))
-                                      (Str s, _)            -> return (Str (s ++ (showExpr e2)))
-                                      (_, Str s)            -> return (Str ((showExpr e1) ++ s))
+                                      (Str s, _)            -> return (Str (s ++ showExpr e2))
+                                      (_, Str s)            -> return (Str (showExpr e1 ++ s))
                                       _                     -> raise "Runtime error" -- TODO
   evalExpr (Minus expr1 expr2) = do e1 <- evalExpr expr1
                                     e2 <- evalExpr expr2
@@ -187,7 +187,7 @@ module Execute where
                                 (f,s) = unzip l
                             in do el <- mapM evalExpr s
                                   return (JsonObject (mapFromList $ zip f el))
-  evalExpr (Array exprs)  = mapM evalExpr exprs >>= return . Array
+  evalExpr (Array exprs)  = fmap Array (mapM evalExpr exprs) 
   evalExpr (Post expr1 expr2) = do  e1 <- evalExpr expr1
                                     e2 <- evalExpr expr2
                                     s  <- get

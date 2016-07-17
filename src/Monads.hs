@@ -17,14 +17,14 @@ module Monads where
   type Check a = ExceptT String (State (Map ())) a
 
   runChecker :: Check a -> Map () -> Either String a
-  runChecker c s = fst (runState (runExceptT c) s)
+  runChecker c = evalState (runExceptT c)
 
   type Bot a = ExceptT String (StateT BotState IO) a
 
   runBot :: Bot a -> BotState -> IO (Either String a)
-  runBot b s = runStateT (runExceptT b) s >>= (return . fst)
+  runBot b s = fmap fst (runStateT (runExceptT b) s)
 
   type Execution a = ExceptT String (StateT ExecState IO) a
 
   runExecution :: Execution a -> ExecState -> IO (Either String a)
-  runExecution e s = runStateT (runExceptT e) s >>= (return . fst)
+  runExecution e s = fmap fst (runStateT (runExceptT e) s)

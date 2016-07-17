@@ -11,7 +11,7 @@ module Check where
   import Monads (Check, runChecker, raise)
 
   check :: Comm -> Either String Comm
-  check (Comm p c)  = let s = mapFromList $ initCheckMapList ++ (map (\(x,_) -> (x,())) p)
+  check (Comm p c)  = let s = mapFromList $ initCheckMapList ++ map (\(x,_) -> (x,())) p
                       in case runChecker (checkStmts c) s of
                           Left err -> Left err
                           _        -> Right (Comm p c)
@@ -63,6 +63,6 @@ module Check where
   checkExpr (Index e1 e2) = checkExpr e1 >> checkExpr e2
   checkExpr (Get e) = checkExpr e
   checkExpr (Post e1 e2) = checkExpr e1 >> checkExpr e2
-  checkExpr (JsonObject o) = mapM_ checkExpr (map snd $ mapToList o)
+  checkExpr (JsonObject o) = mapM_ (checkExpr . snd) (mapToList o)
   checkExpr (Array e) = mapM_ checkExpr e
   checkExpr _ = return ()

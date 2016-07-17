@@ -15,10 +15,10 @@ module Map where
   lookUp' :: Key -> Map v -> v
   lookUp' k e = case lookUp k e of
                   Just v  -> v
-                  _       -> error "This shouldn't happen if you knew it was already there..."
+                  _       -> error ("Key \""++ k ++ "\" is missing.")
 
   update :: (Key, v) -> Map v -> Map v
-  update (k,v) e = M.insert k v e
+  update (k,v) = M.insert k v
 
   mapFromList :: [(Key, v)] -> Map v
   mapFromList = M.fromList

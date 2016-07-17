@@ -12,6 +12,7 @@ import CommandAST
 %name parse_command command
 %name parse_json json
 %name parse_request request
+%name parse_configuration configuration
 
 %tokentype { Token }
 %lexer { lexer } { TEOF }
@@ -51,7 +52,6 @@ import CommandAST
     IDENTIFIER  { TIdentifier $$ }
     CONST       { TConst $$ }
     COMMAND     { TCommand }
-    VAR         { TVar }
     IF          { TIf }
     ELSE        { TElse }
     WHILE       { TWhile }
@@ -61,6 +61,8 @@ import CommandAST
     TYPENUMBER  { TTNumber }
     TYPESTRING  { TTString }
     TYPEBOOL    { TTBool }
+    TYPEJSON    { TTJson }
+    TYPEARRAY   { TTArray }
 
 %left '='
 
@@ -94,6 +96,8 @@ type    :: { Type }
         : TYPENUMBER                              { Number }
         | TYPESTRING                              { String }
         | TYPEBOOL                                { Bool }
+        | TYPEJSON                                { JSON }
+        | TYPEARRAY                               { ArrayType }
 
 stmts   :: { [Statement] }
         : stmt stmts                              { $1 : $2 }
@@ -168,6 +172,17 @@ arguments :: { [Expr] }
           | IDENTIFIER arguments                  { Str $1 : $2}
           |                                       { [] }
 
+configuration :: { Map String }
+              : settings                          { mapFromList $1 }
+              |                                   {% pFail "Configuration file is empty." }
+
+settings  :: { [(String, String)] }
+          : setting                               { [$1] }
+          | setting settings                      { $1 : $2 }
+
+setting :: { (String, String) }
+        : IDENTIFIER ':' STRING                  { ($1, $3) }
+
 {
 data ParseResult a = Ok a | Failed String
                      deriving Show
@@ -176,7 +191,6 @@ data ParseState = ParseState  { line        :: Int,
                                 identLevel  :: Int,
                                 levelStack  :: [Int]
                               }
-                  deriving Show
 
 initParseState :: ParseState
 initParseState = ParseState { line = 1,
@@ -194,14 +208,16 @@ m `pThen` f  = \s st -> case m s st of
                           Ok a     -> f a s st
                           Failed e -> Failed e
 
+pFail :: String -> P a
+pFail err = \_ _ -> Failed err
+
 happyError :: P a
-happyError = \s st -> Failed $ "Line " ++ show (line st) ++ ": Error parsing\n" ++ s ++ "\n" ++ show st
+happyError = \s st -> Failed $ "Line " ++ show (line st) ++ ": Error parsing\n" ++ s
 
 data Token  = TIdentifier Var
             | TConst Double
             | TString String
             | TCommand
-            | TVar
             | TAssign
             | TIf
             | TElse
@@ -213,6 +229,8 @@ data Token  = TIdentifier Var
             | TTNumber
             | TTString
             | TTBool
+            | TTArray
+            | TTJson
             | TComma
             | TParenthesesOpen
             | TParenthesesClose
@@ -300,7 +318,6 @@ lexer cont s = case s of
 lexAlpha :: (Token -> P a) -> P a
 lexAlpha cont s = case span (\c -> isAlpha c || isDigit c || c == '_' ) s  of
                     ("command", rest)  -> cont TCommand rest
-                    ("var", rest)      -> cont TVar rest
                     ("if", rest)       -> cont TIf rest
                     ("else", rest)     -> cont TElse rest
                     ("while", rest)    -> cont TWhile rest
@@ -313,6 +330,8 @@ lexAlpha cont s = case span (\c -> isAlpha c || isDigit c || c == '_' ) s  of
                     ("Number", rest)   -> cont TTNumber rest
                     ("String", rest)   -> cont TTString rest
                     ("Bool", rest)     -> cont TTBool rest
+                    ("JSON", rest)     -> cont TTJson rest
+                    ("Array", rest)    -> cont TTArray rest
                     (var, rest)        -> cont (TIdentifier var) rest
 
 lexString :: (Token -> P a) -> P a
@@ -346,4 +365,5 @@ lexNumber cont s =  case span (\x -> isDigit x || x == '.') s of
 parseCommand s = parse_command s initParseState
 parseJSON s = parse_json s initParseState
 parseRequest s = parse_request s initParseState
+parseConfiguration s = parse_configuration s initParseState
 }

@@ -21,8 +21,8 @@ module PrettyPrint where
   showExpr :: Expr -> String
   showExpr Null           = "null"
   showExpr (Const n)      = showConst n
-  showExpr (TrueExp)      = "true"
-  showExpr (FalseExp)     = "false"
+  showExpr TrueExp        = "true"
+  showExpr FalseExp       = "false"
   showExpr (Str s)        = '\"' : (s ++ "\"")
   showExpr (JsonObject o) = showJsonObject (mapToList o)
   showExpr (Array a)      = showArray a

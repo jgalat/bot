@@ -31,6 +31,6 @@ module TelegramAPI
   sendMessage m token to msg =  let json = encode SimpleMessage {to = to, msg = msg, pm = "Markdown"}
                                 in  decode <$> liftIO (post m (apiURL ++ token ++ "/sendMessage") json)
 
-  sendMessage' :: (MonadIO m) => Manager -> String -> Int -> String -> m (ByteString)
+  sendMessage' :: (MonadIO m) => Manager -> String -> Int -> String -> m ByteString
   sendMessage' m token to msg = let json = encode SimpleMessage {to = to, msg = msg, pm = "Markdown"}
                                 in liftIO (post m (apiURL ++ token ++ "/sendMessage") json)
