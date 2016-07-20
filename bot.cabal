@@ -28,6 +28,7 @@ executable bot
                        array,
                        containers,
                        mtl,
-                       string-conversions
+                       string-conversions,
+                       unix
   hs-source-dirs:      src
   default-language:    Haskell2010

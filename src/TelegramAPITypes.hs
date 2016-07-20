@@ -31,7 +31,7 @@ module TelegramAPITypes where
     parseJSON _           = mzero
 
   data Message = Message {  message_id  :: Int,
-                            from        :: Maybe User,
+                            from        :: User,
                             chat        :: Chat,
                             date        :: Int,
                             text        :: Maybe String
@@ -39,7 +39,7 @@ module TelegramAPITypes where
 
   instance FromJSON Message where
     parseJSON (Object v)  = Message <$> v .: "message_id"
-                                    <*> v .:? "from"
+                                    <*> v .: "from"
                                     <*> v .: "chat"
                                     <*> v .: "date"
                                     <*> v .:? "text"

@@ -11,23 +11,27 @@ module State where
   data BotState = BotState  { activeCommands  :: Map Comm,
                               updateId        :: Int,
                               token           :: String,
-                              manager         :: Manager
+                              manager         :: Manager,
+                              users           :: Map Int
                             }
 
   initBotState :: Manager -> BotState
   initBotState m = BotState { activeCommands  = initMap,
                               updateId        = 0,
                               token           = "",
-                              manager         = m
+                              manager         = m,
+                              users           = initMap
                             }
 
   data ExecState = ExecState  { exprEnv     :: Map Expr,
                                 tokenBot    :: String,
-                                managerBot  :: Manager
+                                managerBot  :: Manager,
+                                usersBot    :: Map Int
                               }
 
-  initExecState :: Manager -> Int -> String -> ExecState
-  initExecState m chat token = ExecState  { exprEnv = mapFromList [("chat", Const (fromIntegral chat)), ("_", Const 0)],
-                                            tokenBot = token,
-                                            managerBot = m
-                                          }
+  initExecState :: Manager -> Int -> ExecState
+  initExecState m chat = ExecState  { exprEnv = mapFromList [("chat", Const (fromIntegral chat)), ("_", Null)],
+                                      tokenBot = "",
+                                      managerBot = m,
+                                      usersBot = initMap
+                                    }

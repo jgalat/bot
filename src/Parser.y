@@ -154,15 +154,15 @@ pairs   :: { [(String, Expr)] }
         | pair ',' pairs                          { $1 : $3 }
 
 pair    :: { (String, Expr) }
-        : STRING ':' value                        { ($1, $3) }
+        : STRING ':' expr                         { ($1, $3) }
 
 array   :: { [Expr] }
         : '[' ']'                                 { [] }
         | '[' values ']'                          { $2 }
 
 values  :: { [Expr] }
-        : value                                   { [$1] }
-        | value ',' values                        { $1 : $3 }
+        : expr                                    { [$1] }
+        | expr ',' values                         { $1 : $3 }
 
 request :: { (String, [Expr]) }
         : '/'IDENTIFIER arguments                 { ($2, $3) }
@@ -265,55 +265,55 @@ data Token  = TIdentifier Var
 
 lexer :: (Token -> P a) -> P a
 lexer cont s = case s of
-                    []                          -> \st -> case levelStack st of
-                                                            []      -> cont TEOF [] st
-                                                            (x:xs)  -> cont TDedent [] (st { levelStack = xs })
-                    ('\n':('\n':cs))            -> lexer cont ('\n':cs)
-                    ('\n':cs)                   -> \st' ->  let st = st' { line = (line st') + 1 }
-                                                                (identation, input) = span (==' ') cs
-                                                                currIdent = length identation
-                                                                lastIdent = identLevel st
-                                                            in  case input of
-                                                                  ('-':('-': _)) -> lexer cont input st
-                                                                  _              -> if (currIdent > lastIdent)
-                                                                                    then cont TIdent input (st {  levelStack = lastIdent : levelStack st,
-                                                                                                                  identLevel = currIdent })
-                                                                                    else  if (currIdent < lastIdent)
-                                                                                          then cont TDedent input (st { identLevel = head (levelStack st),
-                                                                                                                        levelStack = tail (levelStack st) })
-                                                                                          else lexer cont cs st
-                    (c:cs)
-                        | isSpace c             -> lexer cont cs
-                        | isAlpha c || c == '_' -> lexAlpha cont s
-                        | isDigit c             -> lexNumber cont s
-                    ('-':('-':cs))              -> lexer cont $ dropWhile ((/=) '\n') cs
-                    ('<':('<':cs))              -> cont TGet cs
-                    ('>':('>':cs))              -> cont TPost cs
-                    ('>':('=':cs))              -> cont TGreaterEq cs
-                    ('<':('=':cs))              -> cont TLowerEq cs
-                    ('=':('=':cs))              -> cont TEquals cs
-                    ('\"':cs)                   -> lexString cont cs
-                    ('~':cs)                    -> cont TNot cs
-                    ('&':cs)                    -> cont TAnd cs
-                    ('|':cs)                    -> cont TOr cs
-                    ('>':cs)                    -> cont TGreater cs
-                    ('<':cs)                    -> cont TLower cs
-                    ('=':cs)                    -> cont TAssign cs
-                    ('+':cs)                    -> cont TPlus cs
-                    ('-':cs)                    -> cont TMinus cs
-                    ('*':cs)                    -> cont TAsterisc cs
-                    ('/':cs)                    -> cont TSlash cs
-                    ('!':cs)                    -> cont TExclamation cs
-                    (',':cs)                    -> cont TComma cs
-                    ('(':cs)                    -> cont TParenthesesOpen cs
-                    (')':cs)                    -> cont TParenthesesClose cs
-                    ('[':cs)                    -> cont TBracketsOpen cs
-                    (']':cs)                    -> cont TBracketsClose cs
-                    ('{':cs)                    -> cont TBracesOpen cs
-                    ('}':cs)                    -> cont TBracesClose cs
-                    (':':cs)                    -> cont TColon cs
-                    (';':cs)                    -> cont TSemiColon cs
-                    unknown                     -> \st -> Failed $ "Line " ++ show (line st) ++ ": Unrecognized " ++ (show $ take 10 unknown)++ "..."
+  []                          -> \st -> case levelStack st of
+                                          []      -> cont TEOF [] st
+                                          (x:xs)  -> cont TDedent [] (st { levelStack = xs })
+  ('\n':('\n':cs))            -> lexer cont ('\n':cs)
+  ('\n':cs)                   -> \st' ->  let st = st' { line = (line st') + 1 }
+                                              (identation, input) = span (==' ') cs
+                                              currIdent = length identation
+                                              lastIdent = identLevel st
+                                          in  case input of
+                                                ('-':('-': _)) -> lexer cont input st
+                                                _              -> if (currIdent > lastIdent)
+                                                                  then cont TIdent input (st {  levelStack = lastIdent : levelStack st,
+                                                                                                identLevel = currIdent })
+                                                                  else  if (currIdent < lastIdent)
+                                                                        then cont TDedent input (st { identLevel = head (levelStack st),
+                                                                                                      levelStack = tail (levelStack st) })
+                                                                        else lexer cont cs st
+  (c:cs)
+      | isSpace c             -> lexer cont cs
+      | isAlpha c || c == '_' -> lexAlpha cont s
+      | isDigit c             -> lexNumber cont s
+  ('-':('-':cs))              -> lexer cont $ dropWhile ((/=) '\n') cs
+  ('<':('<':cs))              -> cont TGet cs
+  ('>':('>':cs))              -> cont TPost cs
+  ('>':('=':cs))              -> cont TGreaterEq cs
+  ('<':('=':cs))              -> cont TLowerEq cs
+  ('=':('=':cs))              -> cont TEquals cs
+  ('\"':cs)                   -> lexString cont cs
+  ('~':cs)                    -> cont TNot cs
+  ('&':cs)                    -> cont TAnd cs
+  ('|':cs)                    -> cont TOr cs
+  ('>':cs)                    -> cont TGreater cs
+  ('<':cs)                    -> cont TLower cs
+  ('=':cs)                    -> cont TAssign cs
+  ('+':cs)                    -> cont TPlus cs
+  ('-':cs)                    -> cont TMinus cs
+  ('*':cs)                    -> cont TAsterisc cs
+  ('/':cs)                    -> cont TSlash cs
+  ('!':cs)                    -> cont TExclamation cs
+  (',':cs)                    -> cont TComma cs
+  ('(':cs)                    -> cont TParenthesesOpen cs
+  (')':cs)                    -> cont TParenthesesClose cs
+  ('[':cs)                    -> cont TBracketsOpen cs
+  (']':cs)                    -> cont TBracketsClose cs
+  ('{':cs)                    -> cont TBracesOpen cs
+  ('}':cs)                    -> cont TBracesClose cs
+  (':':cs)                    -> cont TColon cs
+  (';':cs)                    -> cont TSemiColon cs
+  unknown                     -> \st -> Failed $ "Line " ++ show (line st) ++ ": Unrecognized " ++ (show $ take 10 unknown)++ "..."
 
 lexAlpha :: (Token -> P a) -> P a
 lexAlpha cont s = case span (\c -> isAlpha c || isDigit c || c == '_' ) s  of

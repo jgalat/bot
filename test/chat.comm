@@ -1,0 +1,3 @@
+command (String s, String who):
+  result = s >> who
+  _ = result ! "ok" >> chat
