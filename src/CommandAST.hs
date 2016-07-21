@@ -46,4 +46,4 @@ module CommandAST where
             | Post Expr Expr
             | JsonObject (Map Expr)
             | Array [Expr]
-            deriving Show
+            deriving (Eq, Show)

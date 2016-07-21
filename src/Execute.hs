@@ -81,6 +81,17 @@ module Execute where
                                  evalComms stmts) a
       _       -> raise "Runtime error" -- TODO
 
+  isNormal :: Expr -> Bool
+  isNormal Null = True
+  isNormal TrueExp = True
+  isNormal FalseExp = True
+  isNormal (Const _) = True
+  isNormal (Str _ ) = True
+  isNormal _ = False
+
+  areNormal :: Expr -> Expr -> Bool
+  areNormal e1 e2 = isNormal e1 && isNormal e2
+
   evalExpr :: Expr -> Execution Expr
   evalExpr (Var v) = do
     s <- get
@@ -112,56 +123,43 @@ module Execute where
   evalExpr (Equals expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
-    case (e1, e2) of
-      (Const n1, Const n2) -> if n1 == n2
-                              then return TrueExp
-                              else return FalseExp
-      (Str s1, Str s2)     -> if s1 == s2
-                              then return TrueExp
-                              else return FalseExp
-      _                    -> raise "Runtime error" -- TODO
+    if areNormal e1 e2 then if e1 == e2 then return TrueExp
+                            else return FalseExp
+    else raise "Runtime error" -- TODO
   evalExpr (Greater expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
     case (e1, e2) of
-      (Const n1, Const n2) -> if n1 > n2
-                              then return TrueExp
+      (Const n1, Const n2) -> if n1 > n2 then return TrueExp
                               else return FalseExp
-      (Str s1, Str s2)     -> if s1 > s2
-                              then return TrueExp
+      (Str s1, Str s2)     -> if s1 > s2 then return TrueExp
                               else return FalseExp
       _                    -> raise "Runtime error" -- TODO
   evalExpr (Lower expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
     case (e1, e2) of
-      (Const n1, Const n2) -> if n1 < n2
-                              then return TrueExp
+      (Const n1, Const n2) -> if n1 < n2 then return TrueExp
                               else return FalseExp
-      (Str s1, Str s2)     -> if s1 < s2
-                              then return TrueExp
+      (Str s1, Str s2)     -> if s1 < s2 then return TrueExp
                               else return FalseExp
       _                    -> raise "Runtime error" -- TODO
   evalExpr (GreaterEquals expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
     case (e1, e2) of
-      (Const n1, Const n2) -> if n1 >= n2
-                              then return TrueExp
+      (Const n1, Const n2) -> if n1 >= n2 then return TrueExp
                               else return FalseExp
-      (Str s1, Str s2)     -> if s1 >= s2
-                              then return TrueExp
+      (Str s1, Str s2)     -> if s1 >= s2 then return TrueExp
                               else return FalseExp
       _                    -> raise "Runtime error" -- TODO
   evalExpr (LowerEquals expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
     case (e1, e2) of
-      (Const n1, Const n2) -> if n1 <= n2
-                              then return TrueExp
+      (Const n1, Const n2) -> if n1 <= n2 then return TrueExp
                               else return FalseExp
-      (Str s1, Str s2)     -> if s1 <= s2
-                              then return TrueExp
+      (Str s1, Str s2)     -> if s1 <= s2 then return TrueExp
                               else return FalseExp
       _                    -> raise "Runtime error" -- TODO
   evalExpr (Negate expr) = do
@@ -202,7 +200,7 @@ module Execute where
     e2 <- evalExpr expr2
     case (e1, e2) of
       (JsonObject o, Str k) -> case lookUp k o of
-                                Nothing -> raise ("Key "++ k ++ " wasn't found.")
+                                Nothing -> return Null
                                 Just v  -> return v
       (Array [], Const _)   -> raise "Runtime error" -- TODO
       (Array a, Const n)    -> return (safeIndex a (truncate n))
