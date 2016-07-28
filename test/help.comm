@@ -1,0 +1,2 @@
+command():
+  _ = "rly?" >> chat

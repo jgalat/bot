@@ -1,0 +1,6 @@
+command():
+  _ = "giff me commands
+
+/start - show this message
+/feed name url - feed!
+/help - have it" >> chat

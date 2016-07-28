@@ -7,13 +7,16 @@ module Bot where
   import Control.Monad.IO.Class
   import Control.Arrow (second)
   import Data.Maybe
+  import Data.String.Conversions
+  import Control.Exception (catch, IOException)
 
   import TelegramAPI
   import Map
   import CommandAST
-  import Parser (ParseResult(..), parseRequest)
+  import Parser (ParseResult(..), parseRequest, parseCommand)
   import State (BotState (..), initExecState)
   import Monads (Bot, raise)
+  import qualified Communication as C
   import Execute
 
   echoBot :: Bot ()
@@ -60,14 +63,30 @@ module Bot where
                                                                           _    -> False) parsedRequests
                                     in  do  put st
                                             execs <- mapM doRequest requestsOk
+                                            s <- get
                                             mapM_ (\exec -> case exec of
                                                               Left err  -> liftIO $ putStrLn err
                                                               _         -> return ()) execs -- TODO
-                                            put (st { updateId = update_id (last upds) + 1 })
+                                            put (s { updateId = update_id (last upds) + 1 })
                                             mainBot
                   _    -> liftIO (putStrLn "Failed rep!") >> mainBot
 
   doRequest :: (Int, (String, [Expr])) -> Bot (Either String ())
+  doRequest (ch, ("feed", [Str name, Str url])) = do
+                  s <- get
+                  cont <- liftIO $ C.get (manager s) url
+                  case parseCommand (cs cont) of
+                    Ok comm    -> let st = s { activeCommands = update (name, comm) (activeCommands s) }
+                                  in case folder s of
+                                    Nothing  -> fmap Right (put st)
+                                    Just fld -> let file = fld ++ name ++ ".comm"
+                                                in do
+                                                  liftIO $ catch (writeFile file (cs cont))
+                                                        (\e -> let err = show (e :: IOException)
+                                                               in putStrLn $ file ++ ": The file couldn't be opened.\n" ++ err)
+                                                  fmap Right (put st)
+                    Failed err -> return (Left ("feed: " ++ err))
+  doRequest (_, ("feed", _)) = return (Left "feed: wrong arguments")
   doRequest (ch, (r, args)) = do
                   s <- get
                   case lookUp r (activeCommands s) of
