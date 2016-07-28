@@ -9,7 +9,7 @@ module Monads where
 
   import CommandAST (Expr)
   import Map
-  import State (BotState, ExecState)
+  import State (BotState)
 
   raise :: (Monad m, MonadError String m) => String -> m a
   raise = throwError
@@ -24,7 +24,5 @@ module Monads where
   runBot :: Bot a -> BotState -> IO (Either String a)
   runBot b s = fmap fst (runStateT (runExceptT b) s)
 
-  type Execution a = ExceptT String (StateT ExecState IO) a
-
-  runExecution :: Execution a -> ExecState -> IO (Either String a)
-  runExecution e s = fmap fst (runStateT (runExceptT e) s)
+  runExecution :: Bot a -> BotState -> IO (Either String a)
+  runExecution = runBot

@@ -12,7 +12,7 @@ module Bot where
   import Map
   import CommandAST
   import Parser (ParseResult(..), parseRequest)
-  import State (BotState (..), ExecState (..), initExecState)
+  import State (BotState (..), initExecState)
   import Monads (Bot, raise)
   import Execute
 
@@ -72,8 +72,8 @@ module Bot where
                   s <- get
                   case lookUp r (activeCommands s) of
                     Just cmd -> do
-                      exec <- liftIO $ execute args ((initExecState (manager s) ch) { usersBot = users s,
-                                                                                      tokenBot = token s
+                      exec <- liftIO $ execute args ((initExecState (manager s) ch) { users = users s,
+                                                                                      token = token s
                                                                                     }) cmd
                       case exec of
                         Left err -> return (Left (r ++ ": " ++ err))

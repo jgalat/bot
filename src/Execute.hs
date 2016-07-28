@@ -8,15 +8,15 @@ module Execute where
 
   import CommandAST
   import Map
-  import Monads (Execution, runExecution, raise)
+  import Monads (Bot, runExecution, raise)
   import TelegramAPI
   import qualified Communication as C
-  import State (ExecState (..))
+  import State (BotState (..))
   import Parser
   import PrettyPrint
 
 
-  execute :: [Expr] -> ExecState -> Comm -> IO (Either String ())
+  execute :: [Expr] -> BotState -> Comm -> IO (Either String ())
   execute args st (Comm prmt c) =
     case cmpArgs args (map snd prmt) of
       Left err  -> return (Left err)
@@ -36,10 +36,10 @@ module Execute where
   cmpArgs (JsonObject _ : xs) (JSON : ts) = cmpArgs xs ts
   cmpArgs _ _ = Left "Error" -- TODO
 
-  evalComms :: [Statement] -> Execution ()
+  evalComms :: [Statement] -> Bot ()
   evalComms = mapM_ evalComm
 
-  evalComm :: Statement -> Execution ()
+  evalComm :: Statement -> Bot ()
   evalComm (Assign var expr) = do
     e <- evalExpr expr
     s <- get
@@ -92,7 +92,7 @@ module Execute where
   areNormal :: Expr -> Expr -> Bool
   areNormal e1 e2 = isNormal e1 && isNormal e2
 
-  evalExpr :: Expr -> Execution Expr
+  evalExpr :: Expr -> Bot Expr
   evalExpr (Var v) = do
     s <- get
     return (lookUp' v (exprEnv s))
@@ -222,21 +222,21 @@ module Execute where
     e2 <- evalExpr expr2
     s  <- get
     case (e1, e2) of
-      (Str msg, Const chat) -> do reply <- sendMessage' (managerBot s) (tokenBot s) (truncate chat) (unescape msg)
+      (Str msg, Const chat) -> do reply <- sendMessage' (manager s) (token s) (truncate chat) (unescape msg)
                                   case parseJSON (unescape $ cs reply) of
                                     Ok r        -> return r
                                     Failed err  -> raise err
-      (_, Const chat)       -> do reply <- sendMessage' (managerBot s) (tokenBot s) (truncate chat) (showExpr e1)
+      (_, Const chat)       -> do reply <- sendMessage' (manager s) (token s) (truncate chat) (showExpr e1)
                                   case parseJSON (cs reply) of
                                     Ok r        -> return r
                                     Failed err  -> raise err
-      (Str msg, Str ('@':usr))  ->  case lookUp usr (usersBot s) of
-                                      Just chat -> do reply <- sendMessage' (managerBot s) (tokenBot s) chat (unescape msg)
+      (Str msg, Str ('@':usr))  ->  case lookUp usr (users s) of
+                                      Just chat -> do reply <- sendMessage' (manager s) (token s) chat (unescape msg)
                                                       case parseJSON (unescape $ cs reply) of
                                                         Ok r        -> return r
                                                         Failed err  -> raise err
                                       Nothing   -> return $ JsonObject (mapFromList [("ok", FalseExp)])
-      (_, Str url)          -> do reply <- liftIO $ C.post (managerBot s) url (cs $ showExpr e1) -- TODO Test it well
+      (_, Str url)          -> do reply <- liftIO $ C.post (manager s) url (cs $ showExpr e1) -- TODO Test it well
                                   case parseJSON (cs reply) of
                                     Ok r        -> return r
                                     Failed err  -> raise err
@@ -245,7 +245,7 @@ module Execute where
     s <- get
     e <- evalExpr expr
     case e of
-      Str str -> do reply <- liftIO $ C.get (managerBot s) str
+      Str str -> do reply <- liftIO $ C.get (manager s) str
                     case parseJSON (cs reply) of
                       Ok r        -> return r
                       Failed err  -> raise err

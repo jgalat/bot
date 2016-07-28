@@ -12,7 +12,13 @@ module State where
                               updateId        :: Int,
                               token           :: String,
                               manager         :: Manager,
-                              users           :: Map Int
+                              users           :: Map Int,
+                              folder          :: Maybe String
+                            }
+                | ExecState { exprEnv     :: Map Expr,
+                              token       :: String,
+                              manager     :: Manager,
+                              users       :: Map Int
                             }
 
   initBotState :: Manager -> BotState
@@ -20,18 +26,13 @@ module State where
                               updateId        = 0,
                               token           = "",
                               manager         = m,
-                              users           = initMap
+                              users           = initMap,
+                              folder          = Nothing
                             }
 
-  data ExecState = ExecState  { exprEnv     :: Map Expr,
-                                tokenBot    :: String,
-                                managerBot  :: Manager,
-                                usersBot    :: Map Int
-                              }
-
-  initExecState :: Manager -> Int -> ExecState
-  initExecState m chat = ExecState  { exprEnv = mapFromList [("chat", Const (fromIntegral chat)), ("_", Null)],
-                                      tokenBot = "",
-                                      managerBot = m,
-                                      usersBot = initMap
+  initExecState :: Manager -> Int -> BotState
+  initExecState m chat = ExecState  { exprEnv   = mapFromList [("chat", Const (fromIntegral chat)), ("_", Null)],
+                                      token     = "",
+                                      manager   = m,
+                                      users     = initMap
                                     }

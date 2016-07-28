@@ -42,7 +42,9 @@ module Main where
                                     mapM_ (\(n, _) -> putStrLn $ n ++ ": Ok") successful
                                     let activeComms = mapFromList $ map (\(n, Right c) -> (n, c)) successful
                                     r <- runBot mainBot $ (initBotState m) {  activeCommands  = activeComms,
-                                                                              token           = tokenBot }
+                                                                              token           = tokenBot,
+                                                                              folder          = lookUp "newcommands" configuration
+                                                                            }
                                     case r of
                                       Left err -> putStrLn err -- TODO
                                       _        -> return ()
