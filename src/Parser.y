@@ -212,7 +212,7 @@ pFail :: String -> P a
 pFail err = \_ _ -> Failed err
 
 happyError :: P a
-happyError = \s st -> Failed $ "Line " ++ show (line st) ++ ": Error parsing\n" ++ s
+happyError = \s st -> Failed $ "Line " ++ show (line st) ++ ": Error parsing\n" ++ (take 20 s) ++ "..."
 
 data Token  = TIdentifier Var
             | TConst Double

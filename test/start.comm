@@ -1,6 +1,6 @@
 command():
-  _ = "giff me commands
+  _ = "feed me commands!
 
 /start - show this message
-/feed name url - feed!
+/feed  - feed!
 /help - have it" >> chat

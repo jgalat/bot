@@ -86,7 +86,9 @@ module Bot where
                                                                in putStrLn $ file ++ ": The file couldn't be opened.\n" ++ err)
                                                   fmap Right (put st)
                     Failed err -> return (Left ("feed: " ++ err))
-  doRequest (_, ("feed", _)) = return (Left "feed: wrong arguments")
+  doRequest (ch, ("feed", _)) = do s <- get
+                                   liftIO (sendMessage' (manager s) (token s) ch "Usage: /feed name \"url\"")
+                                   return (Right ())
   doRequest (ch, (r, args)) = do
                   s <- get
                   case lookUp r (activeCommands s) of
