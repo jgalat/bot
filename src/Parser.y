@@ -10,7 +10,7 @@ import CommandAST
 %monad { P } { pThen } { pReturn }
 
 %name parse_command command
-%name parse_json json
+%name parse_json value
 %name parse_request request
 %name parse_configuration configuration
 
