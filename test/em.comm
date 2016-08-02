@@ -1,0 +1,3 @@
+command():
+  emojipasta = << "http://labdcc.fceia.unr.edu.ar/~jgalat/emojipasta/gen/"
+  _ = emojipasta >> chat

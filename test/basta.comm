@@ -1,0 +1,6 @@
+command():
+  req = { "jsonrpc": "2.0", "method": "generateIntegers", "params": { "apiKey": "c22749e2-bfed-4775-b331-cca4e9d7d47c", "n": 1, "min": 0, "max": 2, "replacement": true },"id": 42 }
+  arr = ["[MAIAMEEE](https://i.ytimg.com/vi/BzrA6uykng8/hqdefault.jpg)", "[STAHP](http://m.memegen.com/s6jk5t.jpg)", "[NO ANDA LA WEB](https://i.ytimg.com/vi/W8NQbOgY9yc/maxresdefault.jpg)"]
+  res = req >> "https://api.random.org/json-rpc/1/invoke"
+  first = (((res ! "result") ! "random") ! "data") ! 0
+  _ = arr ! first >> chat
