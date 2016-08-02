@@ -42,7 +42,7 @@ module Bot where
     s     <- get
     reply <- getUpdates (manager s) (token s) (updateId s)
     case reply of
-      Nothing   -> raise "Error Parsing!" -- TODO
+      Nothing   -> liftIO (putStrLn "Warning parse error") >> mainBot
       Just rep  -> case ok rep of
                   True -> case updates rep of
                           []    -> mainBot
@@ -69,7 +69,7 @@ module Bot where
                                                               _         -> return ()) execs -- TODO
                                             put (s { updateId = update_id (last upds) + 1 })
                                             mainBot
-                  _    -> liftIO (putStrLn "Failed rep!") >> mainBot
+                  _    -> liftIO (putStrLn "Warning reply failed") >> mainBot
 
   doRequest :: (Int, (String, [Expr])) -> Bot (Either String ())
   doRequest (ch, ("feed", [Str name, Str url])) = do

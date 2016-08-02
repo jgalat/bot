@@ -268,13 +268,13 @@ lexer cont s = case s of
   []                          -> \st -> case levelStack st of
                                           []      -> cont TEOF [] st
                                           (x:xs)  -> cont TDedent [] (st { levelStack = xs })
-  ('\n':('\n':cs))            -> lexer cont ('\n':cs)
   ('\n':cs)                   -> \st' ->  let st = st' { line = (line st') + 1 }
                                               (identation, input) = span (==' ') cs
                                               currIdent = length identation
                                               lastIdent = identLevel st
                                           in  case input of
                                                 ('-':('-': _)) -> lexer cont input st
+                                                ('\n':_)       -> lexer cont input (st { line = (line st) + 1 })
                                                 _              -> if (currIdent > lastIdent)
                                                                   then cont TIdent input (st {  levelStack = lastIdent : levelStack st,
                                                                                                 identLevel = currIdent })
