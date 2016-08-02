@@ -19,12 +19,12 @@ module Communication
   handleError (StatusCodeException _ l _) = return (maybe "" fromStrict (lookup "X-Response-Body-Start" l))
   handleError _                           = return "" -- TODO
 
-  get :: Manager -> String ->IO ByteString
-  get m url = do  request   <- parseUrl url
+  get :: Manager -> String -> IO ByteString
+  get m url = do  request   <- parseRequest url
                   (responseBody <$> httpLbs request m) `catch` handleError
 
   post :: Manager -> String -> ByteString -> IO ByteString
-  post m url body = do  r     <- parseUrl url
+  post m url body = do  r     <- parseRequest url
                         let request   = r { method = "POST",
                                             requestHeaders = [("Content-Type", "application/json")],
                                             requestBody = RequestBodyLBS body
