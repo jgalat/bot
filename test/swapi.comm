@@ -26,4 +26,6 @@ command(Number i):
     episode = "VII"
 
   if ((i <= 7) & (i > 0)):
-    _ = ( "*" + "Episode " + episode + "*\n" + "*" + (rep ! "title") + "*\n\n" + (rep ! "opening_crawl")) >> chat
+    _ = ( "*" + "Episode " + episode + "*\n" +
+          "*" + (rep ! "title") + "*\n\n" +
+          (rep ! "opening_crawl")) >> chat

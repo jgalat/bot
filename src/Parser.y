@@ -46,7 +46,7 @@ import CommandAST
     '<<'        { TGet }
     '>>'        { TPost }
     '!'         { TExclamation }
-    IDENT       { TIdent }
+    INDENT      { TIndent }
     DEDENT      { TDedent }
     STRING      { TString $$ }
     IDENTIFIER  { TIdentifier $$ }
@@ -79,7 +79,7 @@ import CommandAST
 %%
 
 command :: { Comm }
-        : COMMAND '(' parameters ')' ':' IDENT stmts DEDENT { Comm $3 $7 }
+        : COMMAND '(' parameters ')' ':' INDENT stmts DEDENT  { Comm $3 $7 }
 
 parameters    :: { [(Var, Type)] }
               : list_of_parameters                { $1 }
@@ -105,12 +105,12 @@ stmts   :: { [Statement] }
         |                                         { [] }
 
 stmt    :: { Statement }
-        : IDENTIFIER '=' expr                                         { Assign $1 $3 }
-        | IF expr ':' IDENT stmts DEDENT                              { If $2 $5 }
-        | IF expr ':' IDENT stmts DEDENT ELSE ':' IDENT stmts DEDENT  { IfElse $2 $5 $10 }
-        | WHILE expr ':' IDENT stmts DEDENT                           { While $2 $5 }
-        | DO ':' IDENT stmts DEDENT WHILE expr                        { Do $4 $7 }
-        | FOR IDENTIFIER IN expr ':' IDENT stmts DEDENT               { For $2 $4 $7 }
+        : IDENTIFIER '=' expr                                           { Assign $1 $3 }
+        | IF expr ':' INDENT stmts DEDENT                               { If $2 $5 }
+        | IF expr ':' INDENT stmts DEDENT ELSE ':' INDENT stmts DEDENT  { IfElse $2 $5 $10 }
+        | WHILE expr ':' INDENT stmts DEDENT                            { While $2 $5 }
+        | DO ':' INDENT stmts DEDENT WHILE expr                         { Do $4 $7 }
+        | FOR IDENTIFIER IN expr ':' INDENT stmts DEDENT                { For $2 $4 $7 }
 
 expr    :: { Expr }
         : '(' expr ')'                            { $2 }
@@ -187,16 +187,34 @@ setting :: { (String, String) }
 data ParseResult a = Ok a | Failed String
                      deriving Show
 
-data ParseState = ParseState  { line        :: Int,
-                                identLevel  :: Int,
-                                levelStack  :: [Int]
-                              }
+data ParseState = ParseState  { line            :: Int,
+                                indentSensitive :: Bool,
+                                levelStack      :: [Int]
+                              } deriving Show
 
 initParseState :: ParseState
 initParseState = ParseState { line = 1,
-                              identLevel = 0,
-                              levelStack = []
+                              indentSensitive = True,
+                              levelStack = [0]
                             }
+
+incLine :: ParseState -> ParseState
+incLine s = s { line = line s + 1 }
+
+sensitivityOn :: ParseState -> ParseState
+sensitivityOn s = s { indentSensitive = True }
+
+sensitivityOff :: ParseState -> ParseState
+sensitivityOff s = s { indentSensitive = False }
+
+pushLevel :: Int -> ParseState -> ParseState
+pushLevel n s = s { levelStack = n : levelStack s }
+
+popLevel :: ParseState -> ParseState
+popLevel s = s { levelStack = tail (levelStack s) }
+
+indentLevel :: ParseState -> Int
+indentLevel s = head (levelStack s)
 
 type P a = String -> ParseState -> ParseResult a
 
@@ -212,7 +230,7 @@ pFail :: String -> P a
 pFail err = \_ _ -> Failed err
 
 happyError :: P a
-happyError = \s st -> Failed $ "Line " ++ show (line st) ++ ": Error parsing\n" ++ (take 20 s) ++ "..."
+happyError = \s st -> Failed $ "Line " ++ show (line st) ++ ": Error parsing\n" ++ (take 20 s) ++ "... \n " ++ (show st)
 
 data Token  = TIdentifier Var
             | TConst Double
@@ -258,7 +276,7 @@ data Token  = TIdentifier Var
             | TExclamation
             | TGet
             | TPost
-            | TIdent
+            | TIndent
             | TDedent
             | TEOF
             deriving Show
@@ -266,22 +284,21 @@ data Token  = TIdentifier Var
 lexer :: (Token -> P a) -> P a
 lexer cont s = case s of
   []                          -> \st -> case levelStack st of
-                                          []      -> cont TEOF [] st
-                                          (x:xs)  -> cont TDedent [] (st { levelStack = xs })
-  ('\n':cs)                   -> \st' ->  let st = st' { line = (line st') + 1 }
-                                              (identation, input) = span (==' ') cs
-                                              currIdent = length identation
-                                              lastIdent = identLevel st
+                                          [_]     -> cont TEOF [] st
+                                          (_:_)   -> cont TDedent [] (popLevel st)
+  ('\n':cs)                   -> \st' ->  let st = incLine st'
+                                              (indentation, input) = span (==' ') cs
+                                              currIndent = length indentation
+                                              lastIndent = indentLevel st
                                           in  case input of
-                                                ('-':('-': _)) -> lexer cont input st
-                                                ('\n':_)       -> lexer cont input (st { line = (line st) + 1 })
-                                                _              -> if (currIdent > lastIdent)
-                                                                  then cont TIdent input (st {  levelStack = lastIdent : levelStack st,
-                                                                                                identLevel = currIdent })
-                                                                  else  if (currIdent < lastIdent)
-                                                                        then cont TDedent input (st { identLevel = head (levelStack st),
-                                                                                                      levelStack = tail (levelStack st) })
-                                                                        else lexer cont cs st
+                                                    ('-':('-': _)) -> lexer cont input st
+                                                    ('\n':_)       -> lexer cont input st
+                                                    _  -> case compare currIndent lastIndent of
+                                                              GT -> if indentSensitive st
+                                                                    then cont TIndent input (pushLevel currIndent st)
+                                                                    else lexer cont input st
+                                                              EQ -> lexer cont input (sensitivityOn st)
+                                                              LT -> cont TDedent input (popLevel (sensitivityOn st))
   (c:cs)
       | isSpace c             -> lexer cont cs
       | isAlpha c || c == '_' -> lexAlpha cont s
@@ -293,12 +310,12 @@ lexer cont s = case s of
   ('<':('=':cs))              -> cont TLowerEq cs
   ('=':('=':cs))              -> cont TEquals cs
   ('\"':cs)                   -> lexString cont cs
+  ('=':cs)                    -> cont TAssign cs . sensitivityOff
   ('~':cs)                    -> cont TNot cs
   ('&':cs)                    -> cont TAnd cs
   ('|':cs)                    -> cont TOr cs
   ('>':cs)                    -> cont TGreater cs
   ('<':cs)                    -> cont TLower cs
-  ('=':cs)                    -> cont TAssign cs
   ('+':cs)                    -> cont TPlus cs
   ('-':cs)                    -> cont TMinus cs
   ('*':cs)                    -> cont TAsterisc cs
