@@ -18,6 +18,7 @@ module Bot where
   import Monads (Bot, raise)
   import qualified Communication as C
   import Execute
+  import Log
 
   echoBot :: Bot ()
   echoBot = do
@@ -42,18 +43,17 @@ module Bot where
     s     <- get
     reply <- getUpdates (manager s) (token s) (updateId s)
     case reply of
-      Nothing   -> liftIO (putStrLn "Warning parse error") >> mainBot
+      Nothing   -> liftIO (logIt "Warning parse error") >> mainBot
       Just rep  -> case ok rep of
                   True -> case updates rep of
                           []    -> mainBot
                           upds  -> let  (usrs, requests) = unzip $ map (\u ->
                                                       let chatId = (chat_id . chat . message) u
                                                           messg = fromMaybe "" ((text . message) u)
-                                                          usernm = if chatId < 0 then Nothing
-                                                                   else (username . from . message) u
+                                                          usernm = (username . from . message) u
                                                       in ((usernm, chatId), (chatId, messg))) upds
                                         newUsers = foldr (\(usr, ch) u ->
-                                                            if isJust usr then update (fromJust usr, ch) u
+                                                            if isJust usr && ch >= 0 then update (fromJust usr, ch) u
                                                             else u) (users s) usrs
                                         st = s { users = newUsers }
                                         parsedRequests = map (second parseRequest) requests
@@ -62,28 +62,40 @@ module Bot where
                                                                           Ok _ -> True
                                                                           _    -> False) parsedRequests
                                     in  do  put st
+                                            liftIO $ mapM_ (\(u,cid) -> if isJust u
+                                                                        then  if cid >= 0
+                                                                              then logIt ("Received request from @" ++ fromJust u ++ " in private chat.")
+                                                                              else logIt ("Received request from @" ++ fromJust u ++ " in group chat.")
+                                                                        else  if cid >= 0
+                                                                              then logIt ("Received request from anonymous user in private chat.")
+                                                                              else logIt ("Received request from anonymous user in group chat.")) usrs
                                             execs <- mapM doRequest requestsOk
                                             s <- get
                                             mapM_ (\exec -> case exec of
-                                                              Left err  -> liftIO $ putStrLn err
+                                                              Left err  -> liftIO $ logIt err
                                                               _         -> return ()) execs -- TODO
                                             put (s { updateId = update_id (last upds) + 1 })
                                             mainBot
-                  _    -> liftIO (putStrLn "Warning reply failed") >> mainBot
+                  _    -> liftIO (logIt "Warning reply failed") >> mainBot
 
   doRequest :: (Int, (String, [Expr])) -> Bot (Either String ())
   doRequest (ch, ("feed", [Str name, Str url])) = do
                   s <- get
                   cont <- liftIO $ C.get (manager s) url
                   case parseCommand (cs cont) of
-                    Ok comm    -> let st = s { activeCommands = update (name, comm) (activeCommands s) }
-                                  in case folder s of
-                                    Nothing  -> fmap Right (put st)
+                    Ok comm    -> do
+                                  liftIO $ logIt ("New command: " ++ name)
+                                  let st = s { activeCommands = update (name, comm) (activeCommands s) }
+                                  case folder s of
+                                    Nothing  -> (liftIO $ logIt (name ++ " wasn't saved. Only on memory.")) >>
+                                                fmap Right (put st)
                                     Just fld -> let file = fld ++ name ++ ".comm"
                                                 in do
+                                                  liftIO $ logIt ("Saving it in file " ++ file)
                                                   liftIO $ catch (writeFile file (cs cont))
                                                         (\e -> let err = show (e :: IOException)
-                                                               in putStrLn $ file ++ ": The file couldn't be opened.\n" ++ err)
+                                                               in (logIt $ file ++ ": The file couldn't be opened.\n" ++ err) >>
+                                                                  logIt (name ++ " wasn't saved. Only on memory."))
                                                   fmap Right (put st)
                     Failed err -> return (Left ("feed: " ++ err))
   doRequest (ch, ("feed", _)) = do s <- get
@@ -93,10 +105,11 @@ module Bot where
                   s <- get
                   case lookUp r (activeCommands s) of
                     Just cmd -> do
-                      exec <- liftIO $ execute args ((initExecState (manager s) ch) { users = users s,
+                      exec <- liftIO $ logIt ("Executing " ++ r) >>
+                                       execute args ((initExecState (manager s) ch) { users = users s,
                                                                                       token = token s
                                                                                     }) cmd
                       case exec of
                         Left err -> return (Left (r ++ ": " ++ err))
                         _        -> return exec -- TODO
-                    Nothing  -> return (Left (r ++ ": not found"))
+                    Nothing  -> return (Left ("Command ("++r ++ ") wasn't found."))

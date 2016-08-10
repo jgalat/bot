@@ -14,6 +14,7 @@ module Execute where
   import State (BotState (..))
   import Parser
   import PrettyPrint
+  import Log
 
 
   execute :: [Expr] -> BotState -> Comm -> IO (Either String ())
@@ -26,15 +27,15 @@ module Execute where
 
   cmpArgs :: [Expr] -> [Type] -> Either String ()
   cmpArgs [] [] = Right ()
-  cmpArgs [] _ = Left "Error" -- TODO
-  cmpArgs _ [] = Left "Error" -- TODO
+  cmpArgs [] _ = Left "Missing arguments"
+  cmpArgs _ [] = Right ()
   cmpArgs (Const _ : xs) (Number : ts) = cmpArgs xs ts
   cmpArgs (Str _ : xs) (String : ts) = cmpArgs xs ts
   cmpArgs (TrueExp : xs) (Bool : ts) = cmpArgs xs ts
   cmpArgs (FalseExp: xs) (Bool : ts) = cmpArgs xs ts
   cmpArgs (Array _ : xs) (ArrayType : ts) = cmpArgs xs ts
   cmpArgs (JsonObject _ : xs) (JSON : ts) = cmpArgs xs ts
-  cmpArgs _ _ = Left "Error" -- TODO
+  cmpArgs _ _ = Left "Arguments need to be normalized"
 
   evalComms :: [Statement] -> Bot ()
   evalComms = mapM_ evalComm
@@ -225,24 +226,24 @@ module Execute where
       (Str msg, Const chat) -> do reply <- sendMessage' (manager s) (token s) (truncate chat) (unescape msg)
                                   case parseJSON (unescape $ cs reply) of
                                     Ok r      -> return r
-                                    Failed e  -> liftIO (putStrLn ("Runtime warning\n" ++ e)) >> -- TODO
+                                    Failed e  -> -- liftIO (logIt ("Runtime warning\n" ++ e)) >> -- TODO
                                                  return (Str (cs reply))
       (_, Const chat)       -> do reply <- sendMessage' (manager s) (token s) (truncate chat) (showExpr e1)
                                   case parseJSON (cs reply) of
                                     Ok r      -> return r
-                                    Failed e  -> liftIO (putStrLn ("Runtime warning\n" ++ e)) >> -- TODO
+                                    Failed e  -> -- liftIO (logIt ("Runtime warning\n" ++ e)) >> -- TODO
                                                  return (Str (cs reply))
       (Str msg, Str ('@':usr))  ->  case lookUp usr (users s) of
                                       Just chat -> do reply <- sendMessage' (manager s) (token s) chat (unescape msg)
                                                       case parseJSON (unescape $ cs reply) of
                                                         Ok r      -> return r
-                                                        Failed e  -> liftIO (putStrLn ("Runtime warning\n" ++ e)) >> -- TODO
+                                                        Failed e  -> -- liftIO (logIt ("Runtime warning\n" ++ e)) >> -- TODO
                                                                      return (Str (cs reply))
                                       Nothing   -> return $ JsonObject (mapFromList [("ok", FalseExp)])
       (_, Str url)          -> do reply <- liftIO $ C.post (manager s) url (cs $ showExpr e1) -- TODO Test it well
                                   case parseJSON (cs reply) of
                                     Ok r      -> return r
-                                    Failed e  -> liftIO (putStrLn ("Runtime warning\n" ++ e)) >> -- TODO
+                                    Failed e  -> -- liftIO (logIt ("Runtime warning\n" ++ e)) >> -- TODO
                                                  return (Str (cs reply))
       _                     -> raise "Not implemented" -- TODO
   evalExpr (Get expr) = do
@@ -252,7 +253,7 @@ module Execute where
       Str str -> do reply <- liftIO $ C.get (manager s) str
                     case parseJSON (cs reply) of
                       Ok r      -> return r
-                      Failed e  ->  liftIO (putStrLn ("Runtime warning\n" ++ e)) >> -- TODO
-                                    return (Str (cs reply))
+                      Failed e  -> -- liftIO (logIt ("Runtime warning\n" ++ e)) >> -- TODO
+                                   return (Str (cs reply))
       _       -> raise "Runtime error" -- TODO
   evalExpr x = return x

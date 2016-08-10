@@ -16,18 +16,19 @@ module Main where
   import Monads (runBot, Bot)
   import State (BotState (..), initBotState)
   import Communication (managertls)
+  import Log
 
   main :: IO ()
   main = do
-    putStrLn "Saluton Mondo"
+    logIt "Saluton Mondo"
     args <- getArgs
     (conf, files) <- parseArgs args
     configuration <- getConfiguration conf
     m    <- managertls
     case lookUp "token" configuration of
-      Just tokenBot ->  putStrLn ("Token: " ++ tokenBot) >>
+      Just tokenBot ->  logIt ("Token: " ++ tokenBot) >>
                         case files of
-                          [] -> do  putStrLn "Repeating everything..."
+                          [] -> do  logIt "Repeating everything..."
                                     r <- runBot echoBot $ (initBotState m) { token = tokenBot }
                                     case r of
                                       Left err -> putStrLn err -- TODO
@@ -39,7 +40,7 @@ module Main where
                                                                                         Right _ -> True
                                                                                         _       -> False) checked
                                     mapM_ (\(n, Left err) -> putStrLn $ n ++ ": " ++ err) failed
-                                    mapM_ (\(n, _) -> putStrLn $ n ++ ": Ok") successful
+                                    mapM_ (\(n, _) -> logIt $ n ++ ": Ok") successful
                                     let activeComms = mapFromList $ map (\(n, Right c) -> (n, c)) successful
                                     r <- runBot mainBot $ (initBotState m) {  activeCommands  = activeComms,
                                                                               token           = tokenBot,
@@ -48,13 +49,13 @@ module Main where
                                     case r of
                                       Left err -> putStrLn err -- TODO
                                       _        -> return ()
-      Nothing -> putStrLn "Missing token in configration file." >> exitFailure
+      Nothing -> logIt "Missing token in configration file." >> exitFailure
 
   compileFile :: String -> IO (String, Comm)
   compileFile file = do
     content <- catch (readFile file) (\e -> let err = show (e :: IOException)
                                             in do
-                                              putStrLn $ file ++ ": The file couldn't be opened.\n" ++ err
+                                              logIt $ file ++ ": The file couldn't be opened.\n" ++ err
                                               return "")
     case content of
       ""  ->  return ("", Comm [] [])
@@ -75,10 +76,10 @@ module Main where
   getConfiguration conf = do
     content <- catch (readFile conf) (\e -> let err = show (e :: IOException)
                                             in do
-                                              putStrLn $ conf ++ ": The file couldn't be opened.\n" ++ err
+                                              logIt $ conf ++ ": The file couldn't be opened.\n" ++ err
                                               return "")
     case content of
-      "" -> putStrLn "Configuration file is empty." >> exitFailure
+      "" -> logIt "Configuration file is empty." >> exitFailure
       _  -> case parseConfiguration content of
               Ok c        -> return c
               Failed err  -> putStrLn (conf ++ ": " ++ err) >> exitFailure
