@@ -20,18 +20,19 @@ module Main where
 
   main :: IO ()
   main = do
-    logIt "Saluton Mondo"
     args <- getArgs
     (conf, files) <- parseArgs args
     configuration <- getConfiguration conf
+    let lf = lookUp "logfile" configuration
+    logInfo lf "Starting bot..."
     m    <- managertls
     case lookUp "token" configuration of
-      Just tokenBot ->  logIt ("Token: " ++ tokenBot) >>
+      Just tokenBot ->  logInfo lf ("Token: " ++ tokenBot) >>
                         case files of
-                          [] -> do  logIt "Repeating everything..."
+                          [] -> do  logInfo lf "Repeating everything..."
                                     r <- runBot echoBot $ (initBotState m) { token = tokenBot }
                                     case r of
-                                      Left err -> putStrLn err -- TODO
+                                      Left err -> logInfo lf err -- TODO
                                       _        -> return ()
                           _  -> do  parsed <- mapM compileFile files
                                     let parsedOk  = filter ((/="") . fst) parsed
@@ -39,29 +40,30 @@ module Main where
                                     let (successful, failed) = partition (\(_, r) ->  case r of
                                                                                         Right _ -> True
                                                                                         _       -> False) checked
-                                    mapM_ (\(n, Left err) -> putStrLn $ n ++ ": " ++ err) failed
-                                    mapM_ (\(n, _) -> logIt $ n ++ ": Ok") successful
+                                    mapM_ (\(n, Left err) -> logInfo lf $ n ++ ": " ++ err) failed
+                                    mapM_ (\(n, _) -> logInfo lf $ n ++ ": Ok") successful
                                     let activeComms = mapFromList $ map (\(n, Right c) -> (n, c)) successful
                                     r <- runBot mainBot $ (initBotState m) {  activeCommands  = activeComms,
                                                                               token           = tokenBot,
-                                                                              folder          = lookUp "newcommands" configuration
+                                                                              folder          = lookUp "newcommands" configuration,
+                                                                              logFile         = lf
                                                                             }
                                     case r of
-                                      Left err -> putStrLn err -- TODO
+                                      Left err -> logInfo lf err -- TODO
                                       _        -> return ()
-      Nothing -> logIt "Missing token in configration file." >> exitFailure
+      Nothing -> logInfo lf "Missing token in configration file." >> exitFailure
 
   compileFile :: String -> IO (String, Comm)
   compileFile file = do
     content <- catch (readFile file) (\e -> let err = show (e :: IOException)
                                             in do
-                                              logIt $ file ++ ": The file couldn't be opened.\n" ++ err
+                                              logInfo Nothing $ file ++ ": The file couldn't be opened.\n" ++ err
                                               return "")
     case content of
       ""  ->  return ("", Comm [] [])
       _   ->  case parseCommand content of
                 Ok comm     -> return (name, comm)
-                Failed err  -> do putStrLn (file ++ ": " ++ err)
+                Failed err  -> do logInfo Nothing (file ++ ": " ++ err)
                                   return ("", Comm [] [])
     where name'  = takeWhile (/= '/') (reverse file)
           name   = takeWhile (/='.') (reverse name')
@@ -76,13 +78,13 @@ module Main where
   getConfiguration conf = do
     content <- catch (readFile conf) (\e -> let err = show (e :: IOException)
                                             in do
-                                              logIt $ conf ++ ": The file couldn't be opened.\n" ++ err
+                                              logInfo Nothing $ conf ++ ": The file couldn't be opened.\n" ++ err
                                               return "")
     case content of
-      "" -> logIt "Configuration file is empty." >> exitFailure
+      "" -> logInfo Nothing "Configuration file is empty." >> exitFailure
       _  -> case parseConfiguration content of
               Ok c        -> return c
-              Failed err  -> putStrLn (conf ++ ": " ++ err) >> exitFailure
+              Failed err  -> logInfo Nothing (conf ++ ": " ++ err) >> exitFailure
 
   usage :: String
   usage = "Usage: bot -c config [files]"

@@ -1,0 +1,6 @@
+-- Bot token (e.g. 209020113:AAHwafW0e8NLszCgQUrIvqJRsPhAkoHDTlU)
+token : ""
+-- (Optional) Folder where to store new downloaded commands (e.g. downloaded/)
+newcommands : ""
+-- (Optional) Logging file (e.g. bot.log)
+logfile : ""

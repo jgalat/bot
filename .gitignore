@@ -1,6 +1,5 @@
-src/Keys.hs
-src/web
 src/Parser.hs
+*.log
 *.info
 dist
 dist-*

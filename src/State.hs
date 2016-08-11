@@ -13,12 +13,14 @@ module State where
                               token           :: String,
                               manager         :: Manager,
                               users           :: Map Int,
-                              folder          :: Maybe String
+                              folder          :: Maybe String,
+                              logFile         :: Maybe String
                             }
                 | ExecState { exprEnv     :: Map Expr,
                               token       :: String,
                               manager     :: Manager,
-                              users       :: Map Int
+                              users       :: Map Int,
+                              logFile     :: Maybe String
                             }
 
   initBotState :: Manager -> BotState
@@ -27,12 +29,14 @@ module State where
                               token           = "",
                               manager         = m,
                               users           = initMap,
-                              folder          = Nothing
+                              folder          = Nothing,
+                              logFile         = Nothing
                             }
 
   initExecState :: Manager -> Int -> BotState
   initExecState m chat = ExecState  { exprEnv   = mapFromList [("chat", Const (fromIntegral chat)), ("_", Null)],
                                       token     = "",
                                       manager   = m,
-                                      users     = initMap
+                                      users     = initMap,
+                                      logFile   = Nothing
                                     }
