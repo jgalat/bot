@@ -190,7 +190,7 @@ data ParseResult a = Ok a | Failed String
 data ParseState = ParseState  { line            :: Int,
                                 indentSensitive :: Bool,
                                 levelStack      :: [Int]
-                              } deriving Show
+                              } -- deriving Show
 
 initParseState :: ParseState
 initParseState = ParseState { line = 1,
@@ -230,7 +230,7 @@ pFail :: String -> P a
 pFail err = \_ _ -> Failed err
 
 happyError :: P a
-happyError = \s st -> Failed $ "Line " ++ show (line st) ++ ": Error parsing\n" ++ (take 20 s) ++ "... \n " ++ (show st)
+happyError = \s st -> Failed $ "Line " ++ show (line st) ++ ": Error parsing\n" ++ (take 20 s) ++ "... \n " -- ++ (show st)
 
 data Token  = TIdentifier Var
             | TConst Double
@@ -366,7 +366,7 @@ lexString cont s =  let (string, rest) = getString [] s
                                                           'n'  -> getString ('\n':str) xs
                                                           't'  -> getString ('\t':str) xs
                                                           'r'  -> getString ('\r':str) xs
-                                                          _    -> (str, [])
+                                                          _    -> getString ('\\':(x:str)) xs
                           getString str (x:xs) = getString (x:str) xs
                           rev []     = []
                           rev (x:xs) = rev' [x] xs
