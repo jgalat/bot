@@ -23,7 +23,10 @@ module Main where
     args <- getArgs
     (conf, files) <- parseArgs args
     configuration <- getConfiguration conf
-    let lf = lookUp "logfile" configuration
+    let lf' = lookUp "logfile" configuration
+    let lf = if null lf' then Nothing else lf'
+    let nc' = lookUp "newcommands" configuration
+    let nc = if null nc' then Nothing else nc'
     logInfo lf "Starting bot..."
     m    <- managertls
     case lookUp "token" configuration of
@@ -45,7 +48,7 @@ module Main where
                                     let activeComms = mapFromList $ map (\(n, Right c) -> (n, c)) successful
                                     r <- runBot mainBot $ (initBotState m) {  activeCommands  = activeComms,
                                                                               token           = tokenBot,
-                                                                              folder          = lookUp "newcommands" configuration,
+                                                                              folder          = nc,
                                                                               logFile         = lf
                                                                             }
                                     case r of
