@@ -10,8 +10,9 @@ module Log where
                     zone <- getCurrentTimeZone
                     let now = utcToLocalTime zone time
                     let logtime = formatTime defaultTimeLocale "(%F %H:%M) " now
-                    let logline = logtime ++ s
+                    let logline = "\ESC[34m" ++ logtime ++ "\ESC[m" ++ s
                     putStrLn logline
+                    let logline = logtime ++ s
                     case lf of
                       Nothing -> return ()
                       Just f  -> catch (appendFile f (logline ++ "\n"))
