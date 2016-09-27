@@ -45,7 +45,7 @@ import CommandAST
     '/'         { TSlash }
     '<<'        { TGet }
     '>>'        { TPost }
-    '!'         { TExclamation }
+    '.'         { TDot }
     INDENT      { TIndent }
     DEDENT      { TDedent }
     STRING      { TString $$ }
@@ -74,7 +74,7 @@ import CommandAST
 %left '+' '-'
 %left '*' '/'
 %left NEG
-%left '!'
+%left '.'
 
 %%
 
@@ -129,7 +129,7 @@ expr    :: { Expr }
         | '-' expr %prec NEG                      { Negate $2 }
         | expr '*' expr                           { Multiply $1 $3 }
         | expr '/' expr                           { Divide $1 $3 }
-        | expr '!' expr                           { Index $1 $3 }
+        | expr '.' expr                           { Index $1 $3 }
         | '<<' expr                               { Get $2 }
         | expr '>>' expr                          { Post $1 $3 }
 
@@ -273,7 +273,7 @@ data Token  = TIdentifier Var
             | TMinus
             | TAsterisc
             | TSlash
-            | TExclamation
+            | TDot
             | TGet
             | TPost
             | TIndent
@@ -320,7 +320,7 @@ lexer cont s = case s of
   ('-':cs)                    -> cont TMinus cs
   ('*':cs)                    -> cont TAsterisc cs
   ('/':cs)                    -> cont TSlash cs
-  ('!':cs)                    -> cont TExclamation cs
+  ('.':cs)                    -> cont TDot cs
   (',':cs)                    -> cont TComma cs
   ('(':cs)                    -> cont TParenthesesOpen cs
   (')':cs)                    -> cont TParenthesesClose cs

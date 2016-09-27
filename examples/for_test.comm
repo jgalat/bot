@@ -6,6 +6,6 @@ command ():
     _ = i >> chat
 
   for i in [0,1,2]:
-    _ = ["a", 0, false] ! i >> chat
+    _ = ["a", 0, false] . i >> chat
 
-  _ = "Hello" ! 0 >> chat
+  _ = "Hello" . 0 >> chat
