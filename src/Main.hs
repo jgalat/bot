@@ -12,7 +12,7 @@ module Main where
   import CommandAST (Comm (..))
   import Parser (parseCommand, parseConfiguration, ParseResult (..))
   import Check (check)
-  import Bot (mainBot, echoBot)
+  import Bot (mainBot)
   import Monads (runBot, Bot)
   import State (BotState (..), initBotState)
   import Communication (managertls)
@@ -30,30 +30,24 @@ module Main where
     logInfo lf "Starting bot..."
     m    <- managertls
     case lookUp "token" configuration of
-      Just tokenBot ->  logInfo lf ("Token: " ++ tokenBot) >>
-                        case files of
-                          [] -> do  logInfo lf "Repeating everything..."
-                                    r <- runBot echoBot $ (initBotState m) { token = tokenBot }
-                                    case r of
-                                      Left err -> logInfo lf err -- TODO
-                                      _        -> return ()
-                          _  -> do  parsed <- mapM compileFile files
-                                    let parsedOk  = filter ((/="") . fst) parsed
-                                    let checked   = map (second check) parsedOk
-                                    let (successful, failed) = partition (\(_, r) ->  case r of
-                                                                                        Right _ -> True
-                                                                                        _       -> False) checked
-                                    mapM_ (\(n, Left err) -> logInfo lf $ n ++ ": " ++ err) failed
-                                    mapM_ (\(n, _) -> logInfo lf $ n ++ ": Ok") successful
-                                    let activeComms = mapFromList $ map (\(n, Right c) -> (n, c)) successful
-                                    r <- runBot mainBot $ (initBotState m) {  activeCommands  = activeComms,
-                                                                              token           = tokenBot,
-                                                                              folder          = nc,
-                                                                              logFile         = lf
-                                                                            }
-                                    case r of
-                                      Left err -> logInfo lf err -- TODO
-                                      _        -> return ()
+      Just tokenBot ->  do  logInfo lf ("Token: " ++ tokenBot)
+                            parsed <- mapM compileFile files
+                            let parsedOk  = filter ((/="") . fst) parsed
+                            let checked   = map (second check) parsedOk
+                            let (successful, failed) = partition (\(_, r) ->  case r of
+                                                                                Right _ -> True
+                                                                                _       -> False) checked
+                            mapM_ (\(n, Left err) -> logInfo lf $ n ++ ": " ++ err) failed
+                            mapM_ (\(n, _) -> logInfo lf $ n ++ ": Ok") successful
+                            let activeComms = mapFromList $ map (\(n, Right c) -> (n, c)) successful
+                            r <- runBot mainBot $ (initBotState m) {  activeCommands  = activeComms,
+                                                                      token           = tokenBot,
+                                                                      folder          = nc,
+                                                                      logFile         = lf
+                                                                    }
+                            case r of
+                              Left err -> logInfo lf err -- TODO
+                              _        -> return ()
       Nothing -> logInfo lf "Missing token in configration file." >> exitFailure
 
   compileFile :: String -> IO (String, Comm)

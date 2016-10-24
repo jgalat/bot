@@ -23,6 +23,3 @@ module Monads where
 
   runBot :: Bot a -> BotState -> IO (Either String a)
   runBot b s = fmap fst (runStateT (runExceptT b) s)
-
-  runExecution :: Bot a -> BotState -> IO (Either String a)
-  runExecution = runBot
