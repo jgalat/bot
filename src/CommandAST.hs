@@ -22,7 +22,8 @@ module CommandAST where
                   | For Var Expr [Statement]
                   deriving Show
 
-  data Expr = Null
+  data Expr = DebugExpr
+            | Null
             | TrueExp
             | FalseExp
             | Var Var

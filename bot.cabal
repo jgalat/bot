@@ -28,6 +28,8 @@ executable bot
                        mtl,
                        string-conversions,
                        unix,
-                       time
+                       time,
+                       pretty,
+                       readline
   hs-source-dirs:      src
   default-language:    Haskell2010

@@ -10,7 +10,7 @@ module Bot where
   import Data.String.Conversions
   import Control.Exception (catch, IOException)
   import Data.ByteString.Lazy (ByteString)
-
+  import System.Console.Readline hiding (message)
 
   import TelegramAPI
   import Map
@@ -41,6 +41,28 @@ module Bot where
   postUrlBot :: String -> ByteString -> Bot ByteString
   postUrlBot url p = do s <- get
                         liftIO (C.post (manager s) url p)
+
+  debugBot :: Bot ()
+  debugBot = do
+    s <- get
+    forever $ do
+      line <- liftIO (readline "> ")
+      case line of
+        Just (_:_) -> do liftIO (addHistory (fromJust line))
+                         case parseRequest (fromJust line) of
+                           Ok (c, args) ->
+                              case lookUp c (activeCommands s) of
+                                Just cmd -> do
+                                  e <- do logBot ("Executing " ++ c)
+                                          let xdst = fromDebugBotState s
+                                          execute args xdst cmd
+                                  case e of
+                                    Left err  -> logBot err
+                                    _         -> logBot ("Finished execution of " ++ c)
+                                Nothing  -> logBot ("Command (" ++ c ++ ") wasn't found.")
+                           Failed err   -> logBot err
+        _          -> return ()
+
 
   mainBot :: Bot ()
   mainBot =
@@ -90,19 +112,19 @@ module Bot where
         let lf = logFile s
         case parseCommand (cs cont) of
           Ok comm    -> do
-                        logBot ("New command: " ++ name)
-                        let st = s { activeCommands = update (name, comm) (activeCommands s) }
-                        case folder s of
-                          Nothing  -> logBot (name ++ " wasn't saved. Only on memory.") >>
-                                      fmap Right (put st)
-                          Just fld -> let file = fld ++ name ++ ".comm"
-                                      in do
-                                        logBot ("Saving it in file " ++ file)
-                                        liftIO $ catch (writeFile file (cs cont))
-                                              (\e -> let err = show (e :: IOException)
-                                                     in (logInfo lf (file ++ ": The file couldn't be opened.\n" ++ err)) >>
-                                                         logInfo lf (name ++ " wasn't saved. Only on memory."))
-                                        fmap Right (put st)
+            logBot ("New command: " ++ name)
+            let st = s { activeCommands = update (name, comm) (activeCommands s) }
+            case folder s of
+              Nothing  -> logBot (name ++ " wasn't saved. Only on memory.") >>
+                          fmap Right (put st)
+              Just fld -> let file = fld ++ name ++ ".comm"
+                          in do
+                            logBot ("Saving it in file " ++ file)
+                            liftIO $ catch (writeFile file (cs cont))
+                                  (\e -> let err = show (e :: IOException)
+                                         in (logInfo lf (file ++ ": The file couldn't be opened.\n" ++ err)) >>
+                                             logInfo lf (name ++ " wasn't saved. Only on memory."))
+                            fmap Right (put st)
           Failed err -> return (Left ("feed: " ++ err))
   doRequest (ch, ("feed", _)) = do
         s <- get
@@ -283,8 +305,8 @@ module Bot where
     case (e1, e2) of
       (Const n1, Const n2)  -> return (Const (n1 + n2))
       (Str s1, Str s2)      -> return (Str (s1 ++ s2))
-      (Str s, _)            -> return (Str (s ++ showExpr e2))
-      (_, Str s)            -> return (Str (showExpr e1 ++ s))
+      (Str s, Const n)      -> return (Str (s ++ showConst n))
+      (Const n, Str s)      -> return (Str (showConst n ++ s))
       _                     -> raise "Runtime error" -- TODO
   evalExpr (Minus expr1 expr2) = do
     e1 <- evalExpr expr1
@@ -332,12 +354,16 @@ module Bot where
     e2 <- evalExpr expr2
     s  <- get
     case (e1, e2) of
+      (Str msg, DebugExpr)  -> do logBot ("Bot:\n" ++ msg)
+                                  return Null
+      (_, DebugExpr)        -> do logBot ("Bot:\n" ++ showExprJSONValid e1)
+                                  return Null
       (Str msg, Const chat) -> do reply <- sendMessageBot (truncate chat) (unescape msg)
                                   case parseJSON (unescape $ cs reply) of
                                     Ok r      -> return r
                                     Failed e  -> logBot ("Runtime warning\n" ++ e) >> -- TODO
                                                  return (Str (cs reply))
-      (_, Const chat)       -> do reply <- sendMessageBot (truncate chat) (showExpr e1)
+      (_, Const chat)       -> do reply <- sendMessageBot (truncate chat) (showExprJSONValid e1)
                                   case parseJSON (cs reply) of
                                     Ok r      -> return r
                                     Failed e  -> logBot ("Runtime warning\n" ++ e) >> -- TODO
@@ -349,7 +375,7 @@ module Bot where
                                                         Failed e  -> logBot ("Runtime warning\n" ++ e) >> -- TODO
                                                                      return (Str (cs reply))
                                       Nothing   -> return $ JsonObject (mapFromList [("ok", FalseExp)])
-      (_, Str url)          -> do reply <- postUrlBot url (cs $ showExpr e1) -- TODO Test it well
+      (_, Str url)          -> do reply <- postUrlBot url (cs $ showExprJSONValid e1) -- TODO Test it well
                                   case parseJSON (cs reply) of
                                     Ok r      -> return r
                                     Failed e  -> logBot ("Runtime warning\n" ++ e) >> -- TODO
