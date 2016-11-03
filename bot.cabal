@@ -1,5 +1,5 @@
 name:                bot
-version:             0.1.0.0
+version:             0.0.0.1
 -- synopsis:
 -- description:
 license:             GPL-3
@@ -14,7 +14,19 @@ cabal-version:       >=1.10
 
 executable bot
   main-is:             Main.hs
-  other-modules:       Parser
+  other-modules:       Parser,
+                       Bot,
+                       Check,
+                       CommandAST,
+                       Communication,
+                       Log,
+                       Map,
+                       Monads,
+                       Parser,
+                       PrettyPrint,
+                       State,
+                       TelegramAPI,
+                       TelegramAPITypes
   -- other-extensions:
   build-depends:       base,
                        bytestring,

@@ -2,6 +2,7 @@
 module Parser where
 
 import Data.Char
+import Data.List
 import Map
 
 import CommandAST
@@ -58,11 +59,7 @@ import CommandAST
     DO          { TDo }
     FOR         { TFor }
     IN          { TIn }
-    TYPENUMBER  { TTNumber }
-    TYPESTRING  { TTString }
-    TYPEBOOL    { TTBool }
-    TYPEJSON    { TTJson }
-    TYPEARRAY   { TTArray }
+    TYPE        { TType $$ }
 
 %left '='
 
@@ -90,14 +87,7 @@ list_of_parameters  :: { [(Var, Type)] }
                     | single_parameter  ',' list_of_parameters    { $1 : $3 }
 
 single_parameter    :: { (Var, Type) }
-                    : type IDENTIFIER             { ($2, $1) }
-
-type    :: { Type }
-        : TYPENUMBER                              { Number }
-        | TYPESTRING                              { String }
-        | TYPEBOOL                                { Bool }
-        | TYPEJSON                                { JSON }
-        | TYPEARRAY                               { ArrayType }
+                    : TYPE IDENTIFIER             { ($2, $1) }
 
 stmts   :: { [Statement] }
         : stmt stmts                              { $1 : $2 }
@@ -243,12 +233,7 @@ data Token  = TIdentifier Var
             | TDo
             | TFor
             | TIn
-            | TType
-            | TTNumber
-            | TTString
-            | TTBool
-            | TTArray
-            | TTJson
+            | TType Type
             | TComma
             | TParenthesesOpen
             | TParenthesesClose
@@ -344,12 +329,17 @@ lexAlpha cont s = case span (\c -> isAlpha c || isDigit c || c == '_' ) s  of
                     ("true", rest)     -> cont TTrue rest
                     ("false", rest)    -> cont TFalse rest
                     ("null", rest)     -> cont TNull rest
-                    ("Number", rest)   -> cont TTNumber rest
-                    ("String", rest)   -> cont TTString rest
-                    ("Bool", rest)     -> cont TTBool rest
-                    ("JSON", rest)     -> cont TTJson rest
-                    ("Array", rest)    -> cont TTArray rest
-                    (var, rest)        -> cont (TIdentifier var) rest
+                    ("Number", rest)   -> cont (TType Number) rest
+                    ("String", rest)   -> cont (TType String) rest
+                    ("Bool", rest)     -> cont (TType Bool) rest
+                    ("JSON", rest)     -> cont (TType JSON) rest
+                    ("Array", rest)    -> cont (TType ArrayType) rest
+                    (var, rest)        -> checkVar var cont rest
+
+checkVar :: String -> (Token -> P a) -> P a
+checkVar v cont = if isInfixOf "__" v
+                  then pFail ("Invalid variable name: " ++ v)
+                  else cont (TIdentifier v)
 
 lexString :: (Token -> P a) -> P a
 lexString cont s =  let (string, rest) = getString [] s

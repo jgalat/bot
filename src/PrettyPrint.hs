@@ -2,6 +2,7 @@ module PrettyPrint where
 
   import Map
   import CommandAST
+  import Check
 
   import Text.PrettyPrint.HughesPJ hiding (Str)
 
@@ -28,7 +29,7 @@ module PrettyPrint where
   showExprJSONValid (Str s)        = '\"' : (s ++ "\"")
   showExprJSONValid (JsonObject o) = showJsonObjectJSONValid (mapToList o)
   showExprJSONValid (Array a)      = showArrayJSONValid a
-  showExprJSONValid _ = "WTF!" -- Shouldn't happen ever
+  showExprJSONValid _ = error "Shouldn't happen (showExprJSONValid)"
 
   showJsonObjectJSONValid :: [(String, Expr)] -> String
   showJsonObjectJSONValid [] = "{}"
@@ -58,53 +59,52 @@ module PrettyPrint where
 
   ppExpr :: Expr -> Doc
   ppExpr = ppExpr' 0
-
-  ppExpr' :: Int -> Expr -> Doc
-  ppExpr' _ Null          = text "null"
-  ppExpr' _ TrueExp       = text "true"
-  ppExpr' _ FalseExp      = text "false"
-  ppExpr' _ (Var v)       = text v
-  ppExpr' _ (Const n)     = text (showConst n)
-  ppExpr' _ (Str s)       = text (show s)
-  ppExpr' p (Not e)       = maybeParens (p > precNot) $
-                            text "~" <> ppExpr' precNot e
-  ppExpr' p (And e1 e2)   = maybeParens (p > precAnd) $
-                            ppExpr' precAnd e1 <+> text "&" <+> ppExpr' precAnd e2
-  ppExpr' p (Or e1 e2)    = maybeParens (p > precOr) $
-                            ppExpr' precOr e1 <+> text "|" <+> ppExpr' precOr e2
-  ppExpr' p (Equals e1 e2)= maybeParens (p > precOpsComp) $
-                            ppExpr' precOpsComp e1 <+> text "==" <+> ppExpr' precOpsComp e2
-  ppExpr' p (Greater e1 e2) = maybeParens (p > precOpsComp) $
-                              ppExpr' precOpsComp e1 <+> text ">" <+> ppExpr' precOpsComp e2
-  ppExpr' p (Lower e1 e2) = maybeParens (p > precOpsComp) $
-                            ppExpr' precOpsComp e1 <+> text "<" <+> ppExpr' precOpsComp e2
-  ppExpr' p (GreaterEquals e1 e2) = maybeParens (p > precOpsComp) $
-                                    ppExpr' precOpsComp e1 <+> text ">=" <+> ppExpr' precOpsComp e2
-  ppExpr' p (LowerEquals e1 e2) = maybeParens (p > precOpsComp) $
-                                  ppExpr' precOpsComp e1 <+> text "<=" <+> ppExpr' precOpsComp e2
-  ppExpr' p (Negate e)    = maybeParens (p > precNeg) $
-                            text "-" <>  ppExpr' precNeg e
-  ppExpr' p (Plus e1 e2)  = maybeParens (p > precPlusMinus) $
-                            ppExpr' precPlusMinus e1 <+> text "+" <+> ppExpr' precPlusMinus e2
-  ppExpr' p (Minus e1 e2) = maybeParens (p > precPlusMinus) $
-                            ppExpr' precPlusMinus e1 <+> text "-" <+> ppExpr' precPlusMinus e2
-  ppExpr' p (Multiply e1 e2)= maybeParens (p > precMulDiv) $
-                              ppExpr' precMulDiv e1 <+> text "*" <+> ppExpr' precMulDiv e2
-  ppExpr' p (Divide e1 e2)  = maybeParens (p > precMulDiv) $
-                              ppExpr' precMulDiv e1 <+> text "/" <+> ppExpr' precMulDiv e2
-  ppExpr' p (Index e1 e2) = maybeParens (p > precIndex) $
-                            ppExpr' precIndex e1 <> text "." <> ppExpr' precIndex e2
-  ppExpr' p (Get e)       = maybeParens (p > precOpsComp) $
-                            text "<<" <+> ppExpr' precOpsComp e
-  ppExpr' p (Post e1 e2)  = maybeParens (p > precOpsComp) $
-                            ppExpr' precOpsComp e1 <+> text ">>" <+> ppExpr' precOpsComp e2
-  ppExpr' _ (JsonObject o)= case mapToList o of
-                              []  -> lbrace <> rbrace
-                              kes -> vcat [ lbrace
-                                          , ppKeyExprs kes
-                                          , rbrace
-                                          ]
-  ppExpr' _ (Array a)     = lbrack <> hsep (punctuate comma (map ppExpr a)) <> rbrack
+    where
+      ppExpr' _ Null          = text "null"
+      ppExpr' _ TrueExp       = text "true"
+      ppExpr' _ FalseExp      = text "false"
+      ppExpr' _ (Var v)       = text v
+      ppExpr' _ (Const n)     = text (showConst n)
+      ppExpr' _ (Str s)       = text (show s)
+      ppExpr' p (Not e)       = maybeParens (p > precNot) $
+                                text "~" <> ppExpr' precNot e
+      ppExpr' p (And e1 e2)   = maybeParens (p > precAnd) $
+                                ppExpr' precAnd e1 <+> text "&" <+> ppExpr' precAnd e2
+      ppExpr' p (Or e1 e2)    = maybeParens (p > precOr) $
+                                ppExpr' precOr e1 <+> text "|" <+> ppExpr' precOr e2
+      ppExpr' p (Equals e1 e2)= maybeParens (p > precOpsComp) $
+                                ppExpr' precOpsComp e1 <+> text "==" <+> ppExpr' precOpsComp e2
+      ppExpr' p (Greater e1 e2) = maybeParens (p > precOpsComp) $
+                                  ppExpr' precOpsComp e1 <+> text ">" <+> ppExpr' precOpsComp e2
+      ppExpr' p (Lower e1 e2) = maybeParens (p > precOpsComp) $
+                                ppExpr' precOpsComp e1 <+> text "<" <+> ppExpr' precOpsComp e2
+      ppExpr' p (GreaterEquals e1 e2) = maybeParens (p > precOpsComp) $
+                                        ppExpr' precOpsComp e1 <+> text ">=" <+> ppExpr' precOpsComp e2
+      ppExpr' p (LowerEquals e1 e2) = maybeParens (p > precOpsComp) $
+                                      ppExpr' precOpsComp e1 <+> text "<=" <+> ppExpr' precOpsComp e2
+      ppExpr' p (Negate e)    = maybeParens (p > precNeg) $
+                                text "-" <>  ppExpr' precNeg e
+      ppExpr' p (Plus e1 e2)  = maybeParens (p > precPlusMinus) $
+                                ppExpr' precPlusMinus e1 <+> text "+" <+> ppExpr' precPlusMinus e2
+      ppExpr' p (Minus e1 e2) = maybeParens (p > precPlusMinus) $
+                                ppExpr' precPlusMinus e1 <+> text "-" <+> ppExpr' precPlusMinus e2
+      ppExpr' p (Multiply e1 e2)= maybeParens (p > precMulDiv) $
+                                  ppExpr' precMulDiv e1 <+> text "*" <+> ppExpr' precMulDiv e2
+      ppExpr' p (Divide e1 e2)  = maybeParens (p > precMulDiv) $
+                                  ppExpr' precMulDiv e1 <+> text "/" <+> ppExpr' precMulDiv e2
+      ppExpr' p (Index e1 e2) = maybeParens (p > precIndex) $
+                                ppExpr' precIndex e1 <> text "." <> ppExpr' precIndex e2
+      ppExpr' p (Get e)       = maybeParens (p > precOpsComp) $
+                                text "<<" <+> ppExpr' precOpsComp e
+      ppExpr' p (Post e1 e2)  = maybeParens (p > precOpsComp) $
+                                ppExpr' precOpsComp e1 <+> text ">>" <+> ppExpr' precOpsComp e2
+      ppExpr' _ (JsonObject o)= case mapToList o of
+                                  []  -> lbrace <> rbrace
+                                  kes -> vcat [ lbrace
+                                              , ppKeyExprs kes
+                                              , rbrace
+                                              ]
+      ppExpr' _ (Array a)     = lbrack <> hsep (punctuate comma (map ppExpr a)) <> rbrack
 
   ppKeyExprs :: [(String, Expr)] -> Doc
   ppKeyExprs kes = nest 2 (vcat (punctuate comma (map ppKeyExpr kes)))
@@ -154,5 +154,28 @@ module PrettyPrint where
                               , ppStatements ss
                               ]
 
-  pp :: Comm -> String
-  pp = render . ppComm
+  prComm :: Comm -> String
+  prComm = render . ppComm
+
+  prType :: Type -> String
+  prType = render . ppType
+
+  prTypes :: [Type] -> String
+  prTypes ts = render $ hsep (punctuate comma (map ppType ts))
+
+  prStatement :: Statement -> String
+  prStatement = render . ppStatement
+
+  prExpr :: Expr -> String
+  prExpr = render . ppExpr
+
+--
+-- Errors messages
+--
+
+  typeMatchError :: [Type] -> Expr -> String
+  typeMatchError ts e = "\nExpression: " ++ prExpr e ++ "\ndo not match (any) type expected: " ++ prTypes ts
+
+  indexEmptyError :: Type -> Expr -> String
+  indexEmptyError ArrayType e = "Indexing empty array in expression: " ++ prExpr e
+  indexEmprtError String e    = "Indexing empty string in expression: " ++ prExpr e

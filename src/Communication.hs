@@ -17,7 +17,7 @@ module Communication
 
   handleError :: HttpException -> IO ByteString
   handleError (StatusCodeException _ l _) = return (maybe "" fromStrict (lookup "X-Response-Body-Start" l))
-  handleError _                           = return "" -- TODO
+  handleError _                           = return ""
 
   get :: Manager -> String -> IO ByteString
   get m url = do  request   <- parseRequest url

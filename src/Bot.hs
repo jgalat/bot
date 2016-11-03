@@ -20,11 +20,20 @@ module Bot where
   import Monads
   import qualified Communication as C
   import PrettyPrint
-  import Log (logInfo)
+  import Log
+  import Check
 
   logBot :: String -> Bot ()
   logBot l = do s <- get
-                liftIO (logInfo (logFile s) l)
+                liftIO (logInfo (logFile s) Info l)
+
+  logBotError :: String -> Bot ()
+  logBotError l = do  s <- get
+                      liftIO (logInfo (logFile s) Error l)
+
+  logBotWarning :: String -> Bot ()
+  logBotWarning l = do  s <- get
+                        liftIO (logInfo (logFile s) Warning l)
 
   sendMessageBot :: Int -> String -> Bot ByteString
   sendMessageBot chat msg = do s <- get
@@ -63,7 +72,6 @@ module Bot where
                            Failed err   -> logBot err
         _          -> return ()
 
-
   mainBot :: Bot ()
   mainBot =
     forever $ do
@@ -100,8 +108,8 @@ module Bot where
                                               execs <- mapM doRequest requestsOk
                                               s <- get
                                               mapM_ (\exec -> case exec of
-                                                                Left err  -> logBot err
-                                                                _         -> return ()) execs -- TODO
+                                                                Left err  -> logBotError err
+                                                                _         -> return ()) execs
                                               put (s { updateId = update_id (last upds) + 1 })
                     _    -> logBot "Warning reply failed"
 
@@ -111,20 +119,23 @@ module Bot where
         cont <- getUrlBot url
         let lf = logFile s
         case parseCommand (cs cont) of
-          Ok comm    -> do
-            logBot ("New command: " ++ name)
-            let st = s { activeCommands = update (name, comm) (activeCommands s) }
-            case folder s of
-              Nothing  -> logBot (name ++ " wasn't saved. Only on memory.") >>
-                          fmap Right (put st)
-              Just fld -> let file = fld ++ name ++ ".comm"
-                          in do
-                            logBot ("Saving it in file " ++ file)
-                            liftIO $ catch (writeFile file (cs cont))
-                                  (\e -> let err = show (e :: IOException)
-                                         in (logInfo lf (file ++ ": The file couldn't be opened.\n" ++ err)) >>
-                                             logInfo lf (name ++ " wasn't saved. Only on memory."))
-                            fmap Right (put st)
+          Ok comm    ->
+            case check comm of
+              Left err -> return (Left ("feed:" ++ err))
+              Right _  -> do
+                logBot ("New command: " ++ name)
+                let st = s { activeCommands = update (name, comm) (activeCommands s) }
+                case folder s of
+                  Nothing  -> logBot (name ++ " wasn't saved. Only on memory.") >>
+                              fmap Right (put st)
+                  Just fld -> let file = fld ++ name ++ ".comm"
+                              in do
+                                logBot ("Saving it in file " ++ file)
+                                liftIO $ catch (writeFile file (cs cont))
+                                      (\e -> let err = show (e :: IOException)
+                                             in logInfo lf Error (file ++ ": The file couldn't be opened.\n" ++ err) >>
+                                                logInfo lf Warning (name ++ " wasn't saved. Only on memory."))
+                                fmap Right (put st)
           Failed err -> return (Left ("feed: " ++ err))
   doRequest (ch, ("feed", _)) = do
         s <- get
@@ -139,7 +150,7 @@ module Bot where
                         execute args xst cmd
             case exec of
               Left err -> return (Left (r ++ ": " ++ err))
-              _        -> return exec -- TODO
+              _        -> return exec -- Right ()
           Nothing  -> return (Left ("Command (" ++ r ++ ") wasn't found."))
 
 
@@ -165,8 +176,8 @@ module Bot where
   cmpArgs (FalseExp: xs) (Bool : ts) = cmpArgs xs ts
   cmpArgs (Array _ : xs) (ArrayType : ts) = cmpArgs xs ts
   cmpArgs (JsonObject _ : xs) (JSON : ts) = cmpArgs xs ts
-  -- TODO case where types do not match
-  cmpArgs _ _ = Left "Arguments need to be normalized"
+  cmpArgs (e : _) (t : _) = if isNormal e then Left (typeMatchError [t] e)
+                            else Left "Arguments need to be normal"
 
   evalComms :: [Statement] -> Bot ()
   evalComms = mapM_ evalComm
@@ -175,33 +186,35 @@ module Bot where
   evalComm (Assign var expr) = do
     e <- evalExpr expr
     s <- get
-    put (s { exprEnv = update (var, e) (exprEnv s) })
+    case var of
+      "_" -> return ()
+      _   -> put (s { exprEnv = update (var, e) (exprEnv s) })
   evalComm (If expr stmts) = do
     e <- evalExpr expr
     case e of
       TrueExp   -> evalComms stmts
       FalseExp  -> return ()
-      _         -> raise "Runtime error" -- TODO
+      _         -> raise (typeMatchError [Bool] expr)
   evalComm (IfElse expr stmts1 stmts2) = do
     e <- evalExpr expr
     case e of
       TrueExp   -> evalComms stmts1
       FalseExp  -> evalComms stmts2
-      _         -> raise "Runtime error" -- TODO
+      _         -> raise (typeMatchError [Bool] expr)
   evalComm (While expr stmts) = do
     e <- evalExpr expr
     case e of
       TrueExp   -> do evalComms stmts
                       evalComm (While expr stmts)
       FalseExp  -> return ()
-      _         -> raise "Runtime error" -- TODO
+      _         -> raise (typeMatchError [Bool] expr)
   evalComm (Do stmts expr) = do
     evalComms stmts
     e <- evalExpr expr
     case e of
       TrueExp   -> evalComm (Do stmts expr)
       FalseExp  -> return ()
-      _         -> raise "Runtime error" -- TODO
+      _         -> raise (typeMatchError [Bool] expr)
   evalComm (For v expr stmts) = do
     e <- evalExpr expr
     case e of
@@ -211,18 +224,11 @@ module Bot where
       Str a   -> mapM_ (\c -> do s <- get
                                  put (s { exprEnv = update (v, Str [c]) (exprEnv s) })
                                  evalComms stmts) a
-      _       -> raise "Runtime error" -- TODO
+      _       -> raise (typeMatchError [ArrayType, String] expr)
 
-  isNormal :: Expr -> Bool
-  isNormal Null = True
-  isNormal TrueExp = True
-  isNormal FalseExp = True
-  isNormal (Const _) = True
-  isNormal (Str _ ) = True
-  isNormal _ = False
-
-  areNormal :: Expr -> Expr -> Bool
-  areNormal e1 e2 = isNormal e1 && isNormal e2
+  boolExpr :: Bool -> Expr
+  boolExpr True  = TrueExp
+  boolExpr False = FalseExp
 
   evalExpr :: Expr -> Bot Expr
   evalExpr (Var v) = do
@@ -233,7 +239,7 @@ module Bot where
     case e of
       TrueExp   -> return FalseExp
       FalseExp  -> return TrueExp
-      _         -> raise "Runtime error" -- TODO
+      _         -> raise (typeMatchError [Bool] expr)
   evalExpr (And expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
@@ -242,7 +248,8 @@ module Bot where
       (FalseExp, TrueExp)  -> return FalseExp
       (TrueExp, FalseExp)  -> return FalseExp
       (FalseExp, FalseExp) -> return FalseExp
-      _                    -> raise "Runtime error" -- TODO
+      _                    -> raise (if isBoolNormal e1 then typeMatchError [Bool] expr2
+                                     else typeMatchError [Bool] expr1)
   evalExpr (Or expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
@@ -251,54 +258,54 @@ module Bot where
       (FalseExp, TrueExp)   -> return TrueExp
       (TrueExp, FalseExp)   -> return TrueExp
       (TrueExp, TrueExp)    -> return TrueExp
-      _                     -> raise "Runtime error" -- TODO
+      _                     -> raise (if isBoolNormal e1 then typeMatchError [Bool] expr2
+                                      else typeMatchError [Bool] expr1)
   evalExpr (Equals expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
-    if areNormal e1 e2 then if e1 == e2 then return TrueExp
-                            else return FalseExp
-    else raise "Runtime error" -- TODO
+    if areNormal e1 e2 then return (boolExpr (e1 == e2)) -- (Eq Expr)
+    else raise "Shouldn't happen (1)"
   evalExpr (Greater expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
     case (e1, e2) of
-      (Const n1, Const n2) -> if n1 > n2 then return TrueExp
-                              else return FalseExp
-      (Str s1, Str s2)     -> if s1 > s2 then return TrueExp
-                              else return FalseExp
-      _                    -> raise "Runtime error" -- TODO
+      (Const n1, Const n2) -> return (boolExpr (n1 > n2))
+      (Str s1, Str s2)     -> return (boolExpr (s1 > s2))
+      _                    -> raise (if isNumberNormal e1 then typeMatchError [Number] expr2
+                                     else if isStringNormal e1 then typeMatchError [String] expr2
+                                          else typeMatchError [Number, String] expr1)
   evalExpr (Lower expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
     case (e1, e2) of
-      (Const n1, Const n2) -> if n1 < n2 then return TrueExp
-                              else return FalseExp
-      (Str s1, Str s2)     -> if s1 < s2 then return TrueExp
-                              else return FalseExp
-      _                    -> raise "Runtime error" -- TODO
+      (Const n1, Const n2) -> return (boolExpr (n1 < n2))
+      (Str s1, Str s2)     -> return (boolExpr (s1 < s2))
+      _                    -> raise (if isNumberNormal e1 then typeMatchError [Number] expr2
+                                     else if isStringNormal e1 then typeMatchError [String] expr2
+                                          else typeMatchError [Number, String] expr1)
   evalExpr (GreaterEquals expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
     case (e1, e2) of
-      (Const n1, Const n2) -> if n1 >= n2 then return TrueExp
-                              else return FalseExp
-      (Str s1, Str s2)     -> if s1 >= s2 then return TrueExp
-                              else return FalseExp
-      _                    -> raise "Runtime error" -- TODO
+      (Const n1, Const n2) -> return (boolExpr (n1 >= n2))
+      (Str s1, Str s2)     -> return (boolExpr (s1 >= s2))
+      _                    -> raise (if isNumberNormal e1 then typeMatchError [Number] expr2
+                                     else if isStringNormal e1 then typeMatchError [String] expr2
+                                          else typeMatchError [Number, String] expr1)
   evalExpr (LowerEquals expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
     case (e1, e2) of
-      (Const n1, Const n2) -> if n1 <= n2 then return TrueExp
-                              else return FalseExp
-      (Str s1, Str s2)     -> if s1 <= s2 then return TrueExp
-                              else return FalseExp
-      _                    -> raise "Runtime error" -- TODO
+      (Const n1, Const n2) -> return (boolExpr (n1 <= n2))
+      (Str s1, Str s2)     -> return (boolExpr (s1 <= s2))
+      _                    -> raise (if isNumberNormal e1 then typeMatchError [Number] expr2
+                                     else if isStringNormal e1 then typeMatchError [String] expr2
+                                          else typeMatchError [Number, String] expr1)
   evalExpr (Negate expr) = do
     e <- evalExpr expr
     case e of
       Const n -> return (Const (-n))
-      _       -> raise "Runtime error" -- TODO
+      _       -> raise (typeMatchError [Number] expr)
   evalExpr (Plus expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
@@ -307,26 +314,31 @@ module Bot where
       (Str s1, Str s2)      -> return (Str (s1 ++ s2))
       (Str s, Const n)      -> return (Str (s ++ showConst n))
       (Const n, Str s)      -> return (Str (showConst n ++ s))
-      _                     -> raise "Runtime error" -- TODO
+      _                     -> raise (if isNumberNormal e1 || isStringNormal e1
+                                      then typeMatchError [Number, String] expr2
+                                      else typeMatchError [Number, String] expr1)
   evalExpr (Minus expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
     case (e1, e2) of
       (Const n1, Const n2) -> return (Const (n1 - n2))
-      _                    -> raise "Runtime error" -- TODO
+      _                    -> raise (if isNumberNormal e1 then typeMatchError [Number] expr2
+                                     else typeMatchError [Number] expr1)
   evalExpr (Multiply expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
     case (e1, e2) of
       (Const n1, Const n2) -> return (Const (n1 * n2))
-      _                    -> raise "Runtime error" -- TODO
+      _                    -> raise (if isNumberNormal e1 then typeMatchError [Number] expr2
+                                     else typeMatchError [Number] expr1)
   evalExpr (Divide expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
     case (e1, e2) of
-      (_, Const 0)         -> raise "Runtime error: Division by zero."
+      (_, Const 0)         -> raise "Division by zero."
       (Const n1, Const n2) -> return (Const (n1 / n2))
-      _                    -> raise "Runtime error" -- TODO
+      _                    -> raise (if isNumberNormal e1 then typeMatchError [Number] expr2
+                                     else typeMatchError [Number] expr1)
   evalExpr (Index expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
@@ -334,11 +346,14 @@ module Bot where
       (JsonObject o, Str k) -> case lookUp k o of
                                 Nothing -> return Null
                                 Just v  -> return v
-      (Array [], Const _)   -> raise "Runtime error" -- TODO
+      (Array [], Const _)   -> raise (indexEmptyError ArrayType (Index expr1 expr2))
       (Array a, Const n)    -> return (safeIndex a (truncate n))
-      (Str "", Const _)     -> raise "Runtime error" -- TODO
+      (Str "", Const _)     -> raise (indexEmptyError String (Index expr1 expr2))
       (Str s, Const n)      -> return (Str [(safeIndex s (truncate n))])
-      _                     -> raise "Runtime error" -- TODO
+      _                     -> raise (if isJSON e1 then typeMatchError [String] expr2
+                                      else if isArray e1 || isStringNormal e1
+                                           then typeMatchError [Number] expr2
+                                           else typeMatchError [JSON, ArrayType, String] expr1)
     where safeIndex a n = let len = length a
                           in if n >= len then last a
                              else if n <= 0 then head a
@@ -361,33 +376,33 @@ module Bot where
       (Str msg, Const chat) -> do reply <- sendMessageBot (truncate chat) (unescape msg)
                                   case parseJSON (unescape $ cs reply) of
                                     Ok r      -> return r
-                                    Failed e  -> logBot ("Runtime warning\n" ++ e) >> -- TODO
+                                    Failed e  -> logBotWarning e >>
                                                  return (Str (cs reply))
       (_, Const chat)       -> do reply <- sendMessageBot (truncate chat) (showExprJSONValid e1)
                                   case parseJSON (cs reply) of
                                     Ok r      -> return r
-                                    Failed e  -> logBot ("Runtime warning\n" ++ e) >> -- TODO
+                                    Failed e  -> logBotWarning e >>
                                                  return (Str (cs reply))
       (Str msg, Str ('@':usr))  ->  case lookUp usr (users s) of
                                       Just chat -> do reply <- sendMessageBot chat (unescape msg)
                                                       case parseJSON (unescape $ cs reply) of
                                                         Ok r      -> return r
-                                                        Failed e  -> logBot ("Runtime warning\n" ++ e) >> -- TODO
+                                                        Failed e  -> logBotWarning e >>
                                                                      return (Str (cs reply))
                                       Nothing   -> return $ JsonObject (mapFromList [("ok", FalseExp)])
-      (_, Str url)          -> do reply <- postUrlBot url (cs $ showExprJSONValid e1) -- TODO Test it well
+      (_, Str url)          -> do reply <- postUrlBot url (cs $ showExprJSONValid e1)
                                   case parseJSON (cs reply) of
                                     Ok r      -> return r
-                                    Failed e  -> logBot ("Runtime warning\n" ++ e) >> -- TODO
+                                    Failed e  -> logBotWarning e >>
                                                  return (Str (cs reply))
-      _                     -> raise "Not implemented" -- TODO
+      _                     -> raise (typeMatchError [Number, String] expr2)
   evalExpr (Get expr) = do
     e <- evalExpr expr
     case e of
       Str str -> do reply <- getUrlBot str
                     case parseJSON (cs reply) of
                       Ok r      -> return r
-                      Failed e  -> logBot ("Runtime warning\n" ++ e) >> -- TODO
+                      Failed e  -> logBotWarning e >>
                                    return (Str (cs reply))
-      _       -> raise "Runtime error" -- TODO
+      _       -> raise (typeMatchError [String] expr)
   evalExpr x = return x

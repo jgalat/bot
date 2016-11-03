@@ -6,7 +6,7 @@ module State where
   import CommandAST
 
   initCheckMapList :: [(Key, ())]
-  initCheckMapList = [("chat", ()), ("_", ())]
+  initCheckMapList = [("chat", ())]
 
   data BotState = BotState  { activeCommands  :: Map Comm,
                               updateId        :: Int,
@@ -44,7 +44,7 @@ module State where
                             }
 
   fromBotState :: BotState -> Int -> BotState
-  fromBotState (s @ (BotState _ _ _ _ _ _ _)) chat = ExecState { exprEnv = mapFromList [("chat", Const (fromIntegral chat)), ("_", Null)],
+  fromBotState (s @ (BotState _ _ _ _ _ _ _)) chat = ExecState { exprEnv = mapFromList [("chat", Const (fromIntegral chat))],
                                                                  token   = token s,
                                                                  manager = manager s,
                                                                  users   = users s,
@@ -60,7 +60,7 @@ module State where
                                       }
 
   fromDebugBotState :: BotState -> BotState
-  fromDebugBotState (s @ (DebugBotState _ m u lf)) = DebugExecState { exprEnv = mapFromList [("chat", DebugExpr), ("_", Null)],
+  fromDebugBotState (s @ (DebugBotState _ m u lf)) = DebugExecState { exprEnv = mapFromList [("chat", DebugExpr)],
                                                                       manager = m,
                                                                       users   = u,
                                                                       logFile = lf

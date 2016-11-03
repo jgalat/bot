@@ -24,7 +24,9 @@ module Check where
   checkStmt (Assign v e) = do
     checkExpr e
     s <- get
-    put (update (v,()) s)
+    case v of
+      "_" -> return ()
+      _   -> put (update (v,()) s)
   checkStmt (If e stmts) = do
     checkExpr e
     checkStmts stmts
@@ -52,7 +54,7 @@ module Check where
   checkExpr (Var v) = do
     s <- get
     case lookUp v s of
-      Nothing -> raise "Error" -- TODO
+      Nothing -> raise (v ++ " doesn't exist.")
       Just _  -> return ()
   checkExpr (Not e) = checkExpr e
   checkExpr (And e1 e2) = checkExpr e1 >> checkExpr e2
@@ -73,3 +75,34 @@ module Check where
   checkExpr (JsonObject o) = mapM_ (checkExpr . snd) (mapToList o)
   checkExpr (Array e) = mapM_ checkExpr e
   checkExpr _ = return ()
+
+  isNormal :: Expr -> Bool
+  isNormal Null = True
+  isNormal TrueExp = True
+  isNormal FalseExp = True
+  isNormal (Const _) = True
+  isNormal (Str _ ) = True
+  isNormal _ = False
+
+  areNormal :: Expr -> Expr -> Bool
+  areNormal e1 e2 = isNormal e1 && isNormal e2
+
+  isBoolNormal :: Expr -> Bool
+  isBoolNormal TrueExp  = True
+  isBoolNormal FalseExp = True
+  isBoolNormal _        = False
+
+  isNumberNormal :: Expr -> Bool
+  isNumberNormal (Const _)  = True
+  isNumberNormal _          = False
+
+  isStringNormal :: Expr -> Bool
+  isStringNormal (Str _)  = True
+  isStringNormal _        = False
+
+  isArray :: Expr -> Bool
+  isArray (Array _) = True
+  isArray _         = False
+
+  isJSON (JsonObject _) = True
+  isJSON _              = False
