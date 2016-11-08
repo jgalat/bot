@@ -1,0 +1,27 @@
+command (String city):
+
+  icons = { "01d" : "☀️",   "01n" : "☀️",
+            "02d" : "🌤",  "02n" : "🌤",
+            "03d" : "☁️",   "03n" : "☁️",
+            "04d" : "☁️☁️",  "04n" : "☁️☁️",
+            "09d" : "🌧",  "09n" : "🌧",
+            "10d" : "🌦",  "10n" : "🌦",
+            "11d" : "🌩",  "11n" : "🌩",
+            "13d" : "🌨",  "13n" : "🌨",
+            "50d" : "🌫",  "50n" : "🌫"
+          }
+
+  request = "http://api.openweathermap.org/data/2.5/weather?q=" + city + "&appid=84ca0a0de04485c79c79026b7c675768&units=metric"
+  weather = << request
+
+  w_main = weather . "main"
+  w_weather = weather . "weather" . 0
+
+  message = w_weather . "main" + "\n"
+  mesasge = message + w_weather . "description" + "\n"
+  message = message + "*Temperatura* : " + (w_main . "temp") + " °C\n"
+  message = message + "*Presión* : " + w_main . "pressure" + " hPa\n"
+  message = message + "*Humedad* : " + w_main . "humidity" + " %\n"
+  message = message + icons . (w_weather . "icon")
+
+  _ = message >> chat
