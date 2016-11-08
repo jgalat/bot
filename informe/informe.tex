@@ -1,0 +1,338 @@
+\documentclass[12pt,a4paper,final]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{imakeidx}
+\usepackage[hidelinks]{hyperref}
+\usepackage[none]{hyphenat}
+\usepackage{alltt}
+\author{Jorge Galat}
+\title{Análisis de Lenguajes de Programación \\ Informe Trabajo Final}
+\makeindex
+\date{}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+
+\clearpage
+
+\section{Introducción}
+
+\subsection{Introducción a bots en Telegram}
+Un bot en Telegram es simplemente una cuenta en este servicio la cual es operada por software (no por personas). Usualmente brindan algún tipo de servicio, sirven de interfaz para interactuar con otras aplicaciones en internet o simplemente para divertirse. Casi toda interacción que un usuario quiera realizar con un bot se realiza a través de comandos enviados mediante una conversación de chat dónde esté incluído éste último. También existen los llamados comandos inline los cuales no requieren de la presencia del bot, sino, sólo su mención en un chat. Un comando, por ejemplo, es \texttt{/start}, el cual se debe enviar al iniciar conversación privada por primera vez con el bot y el cual Telegram recomienda que todo bot debe tener. \\
+
+Algunos ejemplos de bots son:
+\begin{description}
+\item [@AlertBot] Se puede programar para que éste envíe un mensaje determinado a una hora concreta a modo de recordatorio.
+\item [@WeatherMan] Con dicho bot se puede obtener una previsión meteorológica en un determinado lugar. Además permite el seteo de preferencias como el idioma o la unidad de medida (Celcius o Farenheit).
+\item [@StoreBot] Un bot para el descubrimiento de otros bots. Permite la búsqueda por categorías y clasifiación de bots.
+\item [@playrpgbot] Se ha hecho hasta un MMORPG el cual se juega con otras personas utilizando únicamente la conversación de chat. 
+\item [@BotFather] Utilizado para la creación y configuración de todos los bots creados.
+\end{description}
+
+
+\subsection{Descripción del proyecto}
+Como proyecto final de la materia se entrega un bot de Telegram programado en Haskell capaz de recibir por chat, en tiempo de ejecución, comandos programados en un DSL. Éstos son agregados a la lista de posibles comandos del bot para futura ejecución. Por el momento no se pueden programar comandos inline, pero es una posible extensión. Todos los comandos agregados al bot pueden ser ejecutados por cualquier usuario que conozca de ellos, otra posible extensión es personalizar la lista de comandos por usuario.
+
+\subsection{Descripción de la API de Telegram}
+Para la comunicación entre el software del bot y el servicio de Telegram se dispone de una API. Consiste de una interfaz http a la cual el bot realiza pedidos \texttt{GET} y \texttt{POST} utilizando JSONs como formato para el intercambio de datos.
+
+Toda interacción se realiza a través de un link con la siguiente forma:
+
+\begin{alltt}
+https://api.telegram.org/bot{\textless}token{\textgreater}/METHOD{\_}NAME
+\end{alltt}
+
+Donde \textbf{token} es la clave única y privada que nos dio @BotFather para autorizar nuestro bot y \textbf{METHOD{\_}NAME} identifica el método que deseamos ejecutar. Por ejemplo:
+
+\begin{alltt}
+https://api.telegram.org/bot123456:ABC-DEF\\1234ghIkl-zyx57W2v1u123ew11/getUpdates
+\end{alltt}
+
+Sería el link al cual ejecutar un \texttt{GET} para obtener nuevos mensajes enviados al bot identificado con esa clave.
+
+Para más información sobre más métodos y como es la estructura de los JSONs para cada uno se puede visitar la guía brindada por la gente de Telegram (\url{https://core.telegram.org/bots/api})
+
+\section{Instalación y uso}
+
+\subsection{Requerimientos}
+El proyecto utiliza Stack (\url{https://docs.haskellstack.org}) para el manejo de dependencias.
+
+\subsection{Compilación}
+El código del proyecto se encuentra alojado en GitHub. Se puede clonar mediante el siguiente comando:
+
+\begin{alltt}
+\$ git clone https://github.com/jgalat0/bot.git
+\end{alltt}
+
+Lueg debería bastar con ejecutar el siguiente comando dentro del directorio del proyecto para obtener el ejecutable:
+
+\begin{alltt}
+\$ cd bot
+\$ stack build
+\end{alltt}
+
+\clearpage
+(Opcional) Se puede instalar en el home de usuario con:
+\begin{alltt}
+\$ stack install
+\end{alltt}
+\texttt{\textasciitilde/.local/bin} se debe encontrar en la variable de entorno \texttt{\$PATH}
+
+\subsection{Como usar}
+
+\subsubsection{Configuración}
+Es posible ejecutar el proyecto sin token de bot en Telegram, se explicará más adelante. Pero si se lo desea correr utilizando el servicio, se debe especificar un archivo de configuración. Se brinda uno de ejemplo (\texttt{config.sample}) del cual se puede deducir como es la estructura. 
+
+Actualmente sólo se pueden setear 3 campos: token, newcommands, logfile.
+
+\begin{description}
+\item [token] El token del bot. Si se desea conseguir uno nuevo, simplemente se debe hablar con @BotFather, el proceso de creación es simple y rápido.
+\item [newcommands] (Opcional) Especifica la ruta dónde se van a guardar los nuevos comandos que se le den al bot en tiempo de ejecución. Caso de no espeficarlo, los comandos quedan en memoria únicamente.
+\item [logfile] (Opcional) Especifica un archivo de para el registro de actividad. Caso de no especificarlo, simplemente no se guardan los logs.
+\end{description}
+
+\subsubsection{Ejecución}
+Se describirá como ejecutar el bot utilizando Stack (caso no se haya ejecutado \texttt{stack install}). Si el bot se encuentra instalado, simplemente se debe eliminar \texttt{stack exec} y \texttt{--} de los siguientes comandos.
+
+Ejecutando
+
+\begin{alltt}
+\$ stack exec bot
+\end{alltt}
+
+El software nos devolverá el siguiente mensaje
+\begin{alltt}
+Usage: bot OPTION [FILES]
+  -h       --help                Print this help message
+  -v       --version             Print version
+  -o       --offline             Start offline mode
+  -c FILE  --configuration=FILE  Set configuration file
+\end{alltt}
+\clearpage
+\begin{description}
+\item [-h] Imprime el mensaje anterior.
+\item [-v] Imprime la versión
+\item [-o] Inicia el bot en modo offline. El bot no se comunicará con Telegram, la conversación con el bot será mediante la terminal. Útil para probar comandos de forma rápida.
+\item [-c FILE] Donde FILE es el archivo de configuración (requerido). El bot inicia modo online interactuando con la API de Telegram. 
+\end{description}
+
+El bot se puede iniciar ya con comandos si se lo desea, estos se especifican luego de la opción. En el directorio \texttt{examples} se pueden encontrar algunos para probar. Tener en cuenta que el nombre del archivo, determina el nombre del commando.
+
+Ejemplos de ejecución:
+\begin{alltt}
+\$ stack exec bot -- -h
+\$ stack exec bot -- -v
+\$ stack exec bot -- -o examples/succ.comm
+\$ stack exec bot -- -c config examples/*
+\end{alltt}
+
+\subsubsection{Comandos}
+Una vez inicializado el bot, los comandos cargados en éste se pueden ejecutar inciando una conversación que incluya al bot o desde la terminal (modo offline), enviando un mensaje de la forma:
+\begin{alltt}
+/comando arg1 arg2 ...
+\end{alltt}
+
+Más adelante se explica más en detalle la sintaxis para ejecutar comandos, como también para escribir uno nuevo.
+
+Ejemplo de comando (sus implementaciones se pueden encontrar en \texttt{examples}:
+
+\begin{alltt}
+/zero
+/swapi 5
+/weather Rosario
+\end{alltt}
+
+\subsubsection{Comando feed}
+El bot ya posee integrado un comando básico, el comando \texttt{/feed}, que se puede ejecutar en chat. El proposito de éste es añadir nuevos comandos a la lista del bot.
+\clearpage
+
+Su uso es de la siguiente forma:
+
+\begin{alltt}
+/feed nombre "url"
+\end{alltt}
+
+Donde el nombre es el identificador del comando para su futuro uso, y la url (entre comillas) la dirección de dónde se encuentre el código. Se pueden usar servicios como Gist (\url{https://gist.github.com/}), o cualquier similar que brinde la posibildad de acceder al archivo plano del código.
+
+\section{Lenguaje}
+
+\subsection{Descripción}
+El lenguaje utilizado para la programación de comandos posee una sintaxis similar a la de Python. Es sensible a la indentación. 
+
+\subsection{Nuevo comando}
+Todo código de comando debe iniciar con la palabra \texttt{command} seguido de los argumentos, si los tiene, (junto con sus tipos) que éste requiere para su ejecución. De la siguiente manera:
+\begin{alltt}
+command (type arg1 , ...):
+  ...
+\end{alltt}
+
+Donde \texttt{type} es el tipo del argumento y \texttt{arg1} (en este caso) el nombre del argumento. Los tipos posibles son: \texttt{Number}, \texttt{String}, \texttt{Bool}, \texttt{JSON} (objeto JSON, leer \url{http://www.json.org/}) o \texttt{Array} (cualquier arreglo de expresiones).
+
+
+\subsubsection{Definición de variables}
+La sintaxis para la definición de una nueva variable es la siguiente:
+
+\begin{alltt}
+var = expr
+\end{alltt}
+
+Donde \texttt{var} es el nombre de la variable y \texttt{expr} la expresión a evaluar para asignar su resultado.
+Se puede optar por desechar el resultado utilizando \texttt{\_} (underscore) de la siguiente manera:
+
+\begin{alltt}
+_ = expr
+\end{alltt}
+
+Hay una variable especial, \texttt{chat}, la cual es el identificador del chat del cual se inicio la ejecución del comando.
+
+\subsubsection{Estructuras de control}
+A continuación se describen las estructuras de control que posee el lenguaje.
+
+\begin{itemize}
+\item Condicional
+\begin{alltt}
+if expr:
+  [statements]
+\end{alltt}
+
+Se evalua la expresión \texttt{expr}, caso devuelva \texttt{true} se ejecutan las sentencias en \texttt{statements}, caso contrario no se ejecuta nada.
+
+\begin{alltt}
+if expr:
+  [statements1]
+else:
+  [statements2]
+\end{alltt}
+
+Similar al anterior. Caso \texttt{expr} devuelva \texttt{true} se ejecutan las sentencias en \texttt{statements1}, caso contrario, las de \texttt{statements2}. 
+
+\item Bucles
+\begin{alltt}
+while expr:
+  [statements]
+\end{alltt}
+
+Se ejecuntan las sentencias en \texttt{statements} mientras \texttt{expr} evalue a \texttt{true}.
+
+\begin{alltt}
+do:
+  [statements]
+while expr
+\end{alltt}
+
+Se ejecutan las sentencias en \texttt{statements} al menos una vez. Luego, al igual que en la estructura \texttt{while}, éstas se volveran a ejecutar mientras \texttt{expr} evalue a \texttt{true}.
+
+\item Iterador
+\begin{alltt}
+for var in expr:
+  [statements]
+\end{alltt}
+
+\texttt{var} es el nombre de la variable, la cual irá cambiando en cada iteración. \texttt{expr} debe evaluar a un \texttt{Array}, en ese caso \texttt{var} iterará sobre los valores que este contenga, o a una \texttt{String}, a lo que \texttt{var} iterará sobre cada caracter. En cada iteración se ejecutarán las sentencias en \texttt{statements}.
+
+\end{itemize}
+
+\subsubsection{Expresiones}
+A continuación se listan constructores de expresiones en el lenguaje.
+
+\begin{itemize}
+
+\item Expresiones básicas
+\begin{itemize}
+\item Números
+\item Cadenas de texto
+\item Booleanos
+\item JSON Objects
+\item Arreglos
+\end{itemize}
+
+\item Operadores aritméticos
+\begin{itemize}
+\item + : Suma convencional 
+\item - : Resta convencional (Negación en caso de ser usado como operación unaria)
+\item * : Multiplicación convencional
+\item / : División convencional
+\end{itemize}
+
+\item Operadores lógicos
+\begin{itemize}
+\item \& : And lógico
+\item \textbar : Or lógico
+\item \textasciitilde : Not lógica
+\end{itemize}
+
+\item Operadores de comparación
+\begin{itemize}
+\item == : Igualdad entre expresiones
+\item \textgreater : Mayor estricto entre números
+\item \textless : Menor estricto entre números
+\item {\textgreater}= : Mayor o igual entre números
+\item {\textless}= : Menor o igual entre números
+\end{itemize}
+
+\item Operadores especiales
+\begin{itemize}
+\item . : Indexación
+\item \textless\textless : Operador GET
+\item \textgreater\textgreater : Operador POST
+\end{itemize}
+\end{itemize}
+
+A continuación se explican con mayor profundidad los operadores especiales.
+
+\begin{description}
+\item [Indexación] Se utiliza para indexar tanto arreglos de expresiones como JSON objects. Ejemplos:
+\begin{alltt}
+[1,2,3,4] . 0 == 1
+{\textbraceleft} "a" : true, "b" : false \textbraceright . "a" == true
+\end{alltt}
+
+\item [GET] Se utiliza para realizar un pedido utilizando el método GET a una url dada. Por ejemplo:
+
+Se puede pedir datos de Luke Skywalker a una API que brinda información sobre Star Wars y guardarlos en una variable.
+\begin{alltt}
+LukeSkywalker = << "http://swapi.co/api/people/1"
+\end{alltt}
+
+\item [POST] Se utiliza para realizar un pedido utilizando el método POST. El operador se comporta de manera diferente dependiendo de con que expresiones se lo utiliza.
+
+\begin{itemize}
+\item Si se utiliza con una constante numérica a la derecha, se asumirá que esta constante es un identificador de chat, enviando lo que está a la izquierda a esa conversación.
+
+\item Si se lo utiliza con una cadena de texto, si ésta comienza con @ (por ejemplo @jgalat), entonces nuevamente se asumirá que se trata de un identificador de chat con ese usuario. Por ejemplo:
+
+Se puede enviar un mensaje al usuario identificado como @jgalat
+\begin{alltt}
+_ = "Hola" >> "@jgalat"
+\end{alltt}
+
+Aclaración: El bot no puede enviar un mensaje sólo con el nombre de usuario (@usuario), mas únicamente con el número que identifica a la conversación. Por lo que se lleva un diccionario con los nombres de usuarios que alguna vez hayan conversado de forma privada con el bot.
+
+\item Caso la cadena de texto sea una url, se realizará un POST a esa url enviando lo que se encuentre a izquierda del operador. Por ejemplo:
+
+\clearpage 
+Podemos pedir un número aletorio entre 0 y 2 a la API que brinda la web \url{random.org}
+\begin{alltt}
+req = \textbraceleft "jsonrpc": "2.0",
+        "method": "generateIntegers",
+        "params":
+         {\textbraceleft} "apiKey": "c22749e2-bfed-4775-b331-cca4e9d7d47c",
+           "n": 1,
+           "min": 0,
+           "max": 2,
+           "replacement": true {\textbraceright},
+        "id": 42 \textbraceright 
+        
+result = req >> "https://api.random.org/json-rpc/1/invoke"
+\end{alltt} 
+\end{itemize}
+\end{description}
+
+\printindex
+
+\end{document}

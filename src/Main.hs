@@ -24,10 +24,8 @@ module Main where
   startMainBot :: String -> [String] -> IO ()
   startMainBot conf files = do
     configuration <- getConfiguration conf
-    let lf' = lookUp "logfile" configuration
-    let lf = if null lf' then Nothing else lf'
-    let nc' = lookUp "newcommands" configuration
-    let nc = if null nc' then Nothing else nc'
+    let lf = getConfigSetting "logfile" configuration
+    let nc = getConfigSetting "newcommands" configuration
     logInfo lf Info "Starting bot..."
     m    <- managertls
     case lookUp "token" configuration of
@@ -108,8 +106,13 @@ module Main where
               Ok c        -> return c
               Failed err  -> logInfo Nothing Error (conf ++ ": " ++ err) >> exitFailure
 
+  getConfigSetting :: String -> Map String -> Maybe String
+  getConfigSetting p conf = case lookUp p conf of
+                              Just "" -> Nothing
+                              x       -> x
+
   usage :: String
-  usage = "Usage: bot [OPTION..] [FILES]"
+  usage = "Usage: bot OPTION [FILES]"
 
   help :: String
   help = usage

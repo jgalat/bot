@@ -54,7 +54,7 @@ module Check where
   checkExpr (Var v) = do
     s <- get
     case lookUp v s of
-      Nothing -> raise (v ++ " doesn't exist.")
+      Nothing -> raise ("Variable \"" ++ v ++ "\" doesn't exist.")
       Just _  -> return ()
   checkExpr (Not e) = checkExpr e
   checkExpr (And e1 e2) = checkExpr e1 >> checkExpr e2

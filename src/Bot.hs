@@ -66,7 +66,7 @@ module Bot where
                                           let xdst = fromDebugBotState s
                                           execute args xdst cmd
                                   case e of
-                                    Left err  -> logBot err
+                                    Left err  -> logBotError (c ++ ": " ++ err)
                                     _         -> logBot ("Finished execution of " ++ c)
                                 Nothing  -> logBot ("Command (" ++ c ++ ") wasn't found.")
                            Failed err   -> logBot err
@@ -121,10 +121,12 @@ module Bot where
         case parseCommand (cs cont) of
           Ok comm    ->
             case check comm of
-              Left err -> return (Left ("feed:" ++ err))
+              Left err -> do  sendMessageBot ch ("👎\n" ++ err)
+                              return (Left ("feed: " ++ err))
               Right _  -> do
                 logBot ("New command: " ++ name)
                 let st = s { activeCommands = update (name, comm) (activeCommands s) }
+                sendMessageBot ch "👍"
                 case folder s of
                   Nothing  -> logBot (name ++ " wasn't saved. Only on memory.") >>
                               fmap Right (put st)
@@ -136,7 +138,8 @@ module Bot where
                                              in logInfo lf Error (file ++ ": The file couldn't be opened.\n" ++ err) >>
                                                 logInfo lf Warning (name ++ " wasn't saved. Only on memory."))
                                 fmap Right (put st)
-          Failed err -> return (Left ("feed: " ++ err))
+          Failed err -> do  sendMessageBot ch ("👎\n" ++ err)
+                            return (Left ("feed: " ++ err))
   doRequest (ch, ("feed", _)) = do
         s <- get
         sendMessageBot ch "Usage: /feed name \"url\""
@@ -375,24 +378,24 @@ module Bot where
                                   return Null
       (Str msg, Const chat) -> do reply <- sendMessageBot (truncate chat) (unescape msg)
                                   case parseJSON (unescape $ cs reply) of
-                                    Ok r      -> return r
+                                    Ok r      -> evalExpr r
                                     Failed e  -> logBotWarning e >>
                                                  return (Str (cs reply))
       (_, Const chat)       -> do reply <- sendMessageBot (truncate chat) (showExprJSONValid e1)
                                   case parseJSON (cs reply) of
-                                    Ok r      -> return r
+                                    Ok r      -> evalExpr r
                                     Failed e  -> logBotWarning e >>
                                                  return (Str (cs reply))
       (Str msg, Str ('@':usr))  ->  case lookUp usr (users s) of
                                       Just chat -> do reply <- sendMessageBot chat (unescape msg)
                                                       case parseJSON (unescape $ cs reply) of
-                                                        Ok r      -> return r
+                                                        Ok r      -> evalExpr r
                                                         Failed e  -> logBotWarning e >>
                                                                      return (Str (cs reply))
                                       Nothing   -> return $ JsonObject (mapFromList [("ok", FalseExp)])
       (_, Str url)          -> do reply <- postUrlBot url (cs $ showExprJSONValid e1)
                                   case parseJSON (cs reply) of
-                                    Ok r      -> return r
+                                    Ok r      -> evalExpr r
                                     Failed e  -> logBotWarning e >>
                                                  return (Str (cs reply))
       _                     -> raise (typeMatchError [Number, String] expr2)
@@ -401,7 +404,7 @@ module Bot where
     case e of
       Str str -> do reply <- getUrlBot str
                     case parseJSON (cs reply) of
-                      Ok r      -> return r
+                      Ok r      -> evalExpr r
                       Failed e  -> logBotWarning e >>
                                    return (Str (cs reply))
       _       -> raise (typeMatchError [String] expr)

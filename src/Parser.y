@@ -1,5 +1,11 @@
 {
-module Parser where
+module Parser (
+  ParseResult (Ok, Failed),
+  parseConfiguration,
+  parseRequest,
+  parseCommand,
+  parseJSON
+  ) where
 
 import Data.Char
 import Data.List
@@ -76,7 +82,7 @@ import CommandAST
 %%
 
 command :: { Comm }
-        : COMMAND '(' parameters ')' ':' INDENT stmts DEDENT  { Comm $3 $7 }
+        : COMMAND '(' parameters ')' ':' stmts_block  { Comm $3 $6 }
 
 parameters    :: { [(Var, Type)] }
               : list_of_parameters                { $1 }
@@ -89,18 +95,21 @@ list_of_parameters  :: { [(Var, Type)] }
 single_parameter    :: { (Var, Type) }
                     : TYPE IDENTIFIER             { ($2, $1) }
 
+stmts_block   :: { [Statement] }
+              : INDENT stmts DEDENT               { $2 }
+
 stmts   :: { [Statement] }
         : stmt stmts                              { $1 : $2 }
         | stmt ';' stmts                          { $1 : $3 }
         |                                         { [] }
 
 stmt    :: { Statement }
-        : IDENTIFIER '=' expr                                           { Assign $1 $3 }
-        | IF expr ':' INDENT stmts DEDENT                               { If $2 $5 }
-        | IF expr ':' INDENT stmts DEDENT ELSE ':' INDENT stmts DEDENT  { IfElse $2 $5 $10 }
-        | WHILE expr ':' INDENT stmts DEDENT                            { While $2 $5 }
-        | DO ':' INDENT stmts DEDENT WHILE expr                         { Do $4 $7 }
-        | FOR IDENTIFIER IN expr ':' INDENT stmts DEDENT                { For $2 $4 $7 }
+        : IDENTIFIER '=' expr                                   { Assign $1 $3 }
+        | IF expr ':' stmts_block                               { If $2 $4 }
+        | IF expr ':' stmts_block ELSE ':' stmts_block          { IfElse $2 $4 $7 }
+        | WHILE expr ':' stmts_block                            { While $2 $4 }
+        | DO ':' stmts_block WHILE expr                         { Do $3 $5 }
+        | FOR IDENTIFIER IN expr ':' stmts_block                { For $2 $4 $6 }
 
 expr    :: { Expr }
         : '(' expr ')'                            { $2 }
@@ -272,7 +281,7 @@ lexer cont s = case s of
                                           [_]     -> cont TEOF [] st
                                           (_:_)   -> cont TDedent [] (popLevel st)
   ('\n':cs)                   -> \st' ->  let st = incLine st'
-                                              (indentation, input) = span (==' ') cs
+                                              (indentation, input) = span isSpace cs
                                               currIndent = length indentation
                                               lastIndent = indentLevel st
                                           in  case input of
