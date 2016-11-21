@@ -19,7 +19,7 @@ module Monads where
   runChecker :: Check a -> Map () -> Either String a
   runChecker c = evalState (runExceptT c)
 
-  type Bot a = ExceptT String (StateT BotState IO) a
+  type Bot = ExceptT String (StateT BotState IO)
 
   runBot :: Bot a -> BotState -> IO (Either String a)
   runBot b s = fmap fst (runStateT (runExceptT b) s)

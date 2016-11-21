@@ -39,6 +39,9 @@ module Bot where
   sendMessageBot chat msg = do s <- get
                                liftIO (sendMessage' (manager s) (token s) chat msg)
 
+  sendMessageBot_ :: Int -> String -> Bot ()
+  sendMessageBot_ c m = sendMessageBot c m >> return ()
+
   getUpdatesBot :: Bot (Maybe Reply)
   getUpdatesBot = do  s <- get
                       getUpdates (manager s) (token s) (updateId s)
@@ -62,12 +65,10 @@ module Bot where
                            Ok (c, args) ->
                               case lookUp c (activeCommands s) of
                                 Just cmd -> do
-                                  e <- do logBot ("Executing " ++ c)
-                                          let xdst = fromDebugBotState s
-                                          execute args xdst cmd
-                                  case e of
-                                    Left err  -> logBotError (c ++ ": " ++ err)
-                                    _         -> logBot ("Finished execution of " ++ c)
+                                  logBot ("Executing " ++ c)
+                                  let xdst = fromDebugBotState s
+                                  execute args xdst cmd `catchError` (\err -> logBotError (c ++ ": " ++ err))
+                                  logBot ("Finished execution of " ++ c)
                                 Nothing  -> logBot ("Command (" ++ c ++ ") wasn't found.")
                            Failed err   -> logBot err
         _          -> return ()
@@ -105,15 +106,12 @@ module Bot where
                                                   else  if cid >= 0
                                                         then logBot ("Received request from anonymous user in private chat.")
                                                         else logBot ("Received request from anonymous user in group chat.")) usrs
-                                              execs <- mapM doRequest requestsOk
+                                              (mapM_ doRequest requestsOk) `catchError` logBotError
                                               s <- get
-                                              mapM_ (\exec -> case exec of
-                                                                Left err  -> logBotError err
-                                                                _         -> return ()) execs
                                               put (s { updateId = update_id (last upds) + 1 })
                     _    -> logBot "Warning reply failed"
 
-  doRequest :: (Int, (String, [Expr])) -> Bot (Either String ())
+  doRequest :: (Int, (String, [Expr])) -> Bot ()
   doRequest (ch, ("feed", [Str name, Str url])) = do
         s <- get
         cont <- getUrlBot url
@@ -122,14 +120,14 @@ module Bot where
           Ok comm    ->
             case check comm of
               Left err -> do  sendMessageBot ch ("👎\n" ++ err)
-                              return (Left ("feed: " ++ err))
+                              raise ("feed: " ++ err)
               Right _  -> do
                 logBot ("New command: " ++ name)
                 let st = s { activeCommands = update (name, comm) (activeCommands s) }
                 sendMessageBot ch "👍"
                 case folder s of
                   Nothing  -> logBot (name ++ " wasn't saved. Only on memory.") >>
-                              fmap Right (put st)
+                              put st
                   Just fld -> let file = fld ++ name ++ ".comm"
                               in do
                                 logBot ("Saving it in file " ++ file)
@@ -137,37 +135,30 @@ module Bot where
                                       (\e -> let err = show (e :: IOException)
                                              in logInfo lf Error (file ++ ": The file couldn't be opened.\n" ++ err) >>
                                                 logInfo lf Warning (name ++ " wasn't saved. Only on memory."))
-                                fmap Right (put st)
+                                put st
           Failed err -> do  sendMessageBot ch ("👎\n" ++ err)
-                            return (Left ("feed: " ++ err))
-  doRequest (ch, ("feed", _)) = do
-        s <- get
-        sendMessageBot ch "Usage: /feed name \"url\""
-        return (Right ())
+                            raise ("feed: " ++ err)
+  doRequest (ch, ("feed", _)) = sendMessageBot_ ch "Usage: /feed name \"url\""
   doRequest (ch, (r, args)) = do
         s <- get
         case lookUp r (activeCommands s) of
           Just cmd -> do
-            exec <-  do logBot ("Executing " ++ r)
-                        let xst = fromBotState s ch
-                        execute args xst cmd
-            case exec of
-              Left err -> return (Left (r ++ ": " ++ err))
-              _        -> return exec -- Right ()
-          Nothing  -> return (Left ("Command (" ++ r ++ ") wasn't found."))
-
+            logBot ("Executing " ++ r)
+            let xst = fromBotState s ch
+            execute args xst cmd `catchError` (\err -> raise (r ++ ": " ++ err))
+          Nothing  -> raise ("Command (" ++ r ++ ") wasn't found.")
 
 --
 -- Execute
 --
 
-  execute :: [Expr] -> BotState -> Comm -> Bot (Either String ())
+  execute :: [Expr] -> BotState -> Comm -> Bot ()
   execute args xst (Comm prmt c) = do
     case cmpArgs args (map snd prmt) of
-      Left err  -> return (Left err)
+      Left err  -> raise err
       _         -> let  envEx   = mapFromList $ zip (map fst prmt) args
                         execSt  = xst { exprEnv = mapUnion (exprEnv xst) envEx }
-                   in  liftIO (runBot (evalComms c) execSt)
+                   in put execSt >> evalComms c
 
   cmpArgs :: [Expr] -> [Type] -> Either String ()
   cmpArgs [] [] = Right ()
@@ -182,6 +173,11 @@ module Bot where
   cmpArgs (e : _) (t : _) = if isNormal e then Left (typeMatchError [t] e)
                             else Left "Arguments need to be normal"
 
+  caseBool :: Expr -> Bot a -> Bot a -> Expr -> Bot a
+  caseBool TrueExp b1 _  _ = b1
+  caseBool FalseExp _ b2 _ = b2
+  caseBool _ _ _ e = raise (typeMatchError [Bool] e)
+
   evalComms :: [Statement] -> Bot ()
   evalComms = mapM_ evalComm
 
@@ -194,30 +190,17 @@ module Bot where
       _   -> put (s { exprEnv = update (var, e) (exprEnv s) })
   evalComm (If expr stmts) = do
     e <- evalExpr expr
-    case e of
-      TrueExp   -> evalComms stmts
-      FalseExp  -> return ()
-      _         -> raise (typeMatchError [Bool] expr)
+    caseBool e (evalComms stmts) (return ()) expr
   evalComm (IfElse expr stmts1 stmts2) = do
     e <- evalExpr expr
-    case e of
-      TrueExp   -> evalComms stmts1
-      FalseExp  -> evalComms stmts2
-      _         -> raise (typeMatchError [Bool] expr)
+    caseBool e (evalComms stmts1) (evalComms stmts2) expr
   evalComm (While expr stmts) = do
     e <- evalExpr expr
-    case e of
-      TrueExp   -> do evalComms stmts
-                      evalComm (While expr stmts)
-      FalseExp  -> return ()
-      _         -> raise (typeMatchError [Bool] expr)
+    caseBool e (evalComms stmts >> evalComm (While expr stmts)) (return ()) expr
   evalComm (Do stmts expr) = do
     evalComms stmts
     e <- evalExpr expr
-    case e of
-      TrueExp   -> evalComm (Do stmts expr)
-      FalseExp  -> return ()
-      _         -> raise (typeMatchError [Bool] expr)
+    caseBool e (evalComm (Do stmts expr)) (return ()) expr
   evalComm (For v expr stmts) = do
     e <- evalExpr expr
     case e of
@@ -239,10 +222,7 @@ module Bot where
     return (lookUp' v (exprEnv s))
   evalExpr (Not expr) = do
     e <- evalExpr expr
-    case e of
-      TrueExp   -> return FalseExp
-      FalseExp  -> return TrueExp
-      _         -> raise (typeMatchError [Bool] expr)
+    caseBool e (return FalseExp) (return TrueExp) expr
   evalExpr (And expr1 expr2) = do
     e1 <- evalExpr expr1
     e2 <- evalExpr expr2
@@ -352,7 +332,7 @@ module Bot where
       (Array [], Const _)   -> raise (indexEmptyError ArrayType (Index expr1 expr2))
       (Array a, Const n)    -> return (safeIndex a (truncate n))
       (Str "", Const _)     -> raise (indexEmptyError String (Index expr1 expr2))
-      (Str s, Const n)      -> return (Str [(safeIndex s (truncate n))])
+      (Str s, Const n)      -> return (Str [safeIndex s (truncate n)])
       _                     -> raise (if isJSON e1 then typeMatchError [String] expr2
                                       else if isArray e1 || isStringNormal e1
                                            then typeMatchError [Number] expr2

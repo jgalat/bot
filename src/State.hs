@@ -44,12 +44,12 @@ module State where
                             }
 
   fromBotState :: BotState -> Int -> BotState
-  fromBotState (s @ (BotState _ _ _ _ _ _ _)) chat = ExecState { exprEnv = mapFromList [("chat", Const (fromIntegral chat))],
-                                                                 token   = token s,
-                                                                 manager = manager s,
-                                                                 users   = users s,
-                                                                 logFile = logFile s
-                                                               }
+  fromBotState (s @ (BotState {})) chat = ExecState {  exprEnv = mapFromList [("chat", Const (fromIntegral chat))],
+                                                       token   = token s,
+                                                       manager = manager s,
+                                                       users   = users s,
+                                                       logFile = logFile s
+                                                     }
   fromBotState _ _ = error "Shouldn't happen (fromBotState)"
 
   initDebugBotState :: Manager -> BotState
