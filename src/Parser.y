@@ -281,7 +281,7 @@ lexer cont s = case s of
                                           [_]     -> cont TEOF [] st
                                           (_:_)   -> cont TDedent [] (popLevel st)
   ('\n':cs)                   -> \st' ->  let st = incLine st'
-                                              (indentation, input) = span isSpace cs
+                                              (indentation, input) = span (==' ') cs
                                               currIndent = length indentation
                                               lastIndent = indentLevel st
                                           in  case input of

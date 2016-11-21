@@ -158,7 +158,10 @@ module Bot where
       Left err  -> raise err
       _         -> let  envEx   = mapFromList $ zip (map fst prmt) args
                         execSt  = xst { exprEnv = mapUnion (exprEnv xst) envEx }
-                   in put execSt >> evalComms c
+                   in do  s <- get
+                          put execSt
+                          evalComms c
+                          put s
 
   cmpArgs :: [Expr] -> [Type] -> Either String ()
   cmpArgs [] [] = Right ()
