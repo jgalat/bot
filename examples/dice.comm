@@ -32,5 +32,4 @@ command(Number a, Number x):
   message = message + "*Sum:* " + sum + "\n"
   message = message + "*Mean:* " + (sum / a)
 
-
   _ = message >> chat
