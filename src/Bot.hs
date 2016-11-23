@@ -106,7 +106,7 @@ module Bot where
                                                   else  if cid >= 0
                                                         then logBot ("Received request from anonymous user in private chat.")
                                                         else logBot ("Received request from anonymous user in group chat.")) usrs
-                                              (mapM_ doRequest requestsOk) `catchError` logBotError
+                                              mapM_ doRequest requestsOk
                                               s <- get
                                               put (s { updateId = update_id (last upds) + 1 })
                     _    -> logBot "Warning reply failed"
@@ -160,7 +160,7 @@ module Bot where
                         execSt  = xst { exprEnv = mapUnion (exprEnv xst) envEx }
                    in do  s <- get
                           put execSt
-                          evalComms c
+                          evalComms c  `catchError` logBotError
                           put s
 
   cmpArgs :: [Expr] -> [Type] -> Either String ()

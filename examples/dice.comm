@@ -1,0 +1,36 @@
+command(Number a, Number x):
+
+  req = { "jsonrpc": "2.0",
+          "method": "generateIntegers",
+          "params":
+            { "apiKey": "c22749e2-bfed-4775-b331-cca4e9d7d47c",
+              "n": a,
+              "min": 1,
+              "max": x,
+              "replacement": true },
+          "id": 42 }
+
+  result = req >> "https://api.random.org/json-rpc/1/invoke"
+
+  sum = 0
+  max = 0
+  min = x
+  rolls = ""
+
+  for i in (result."result"."random"."data"):
+    sum = sum + i
+    if max < i:
+      max = i
+    if min > i:
+      min = i
+    rolls = rolls + " " + i
+
+  message = "🎲🎲\n"
+  message = message + "*Rolls:* " + rolls + "\n"
+  message = message + "*Max:* " + max + "\n"
+  message = message + "*Min:* " + min + "\n"
+  message = message + "*Sum:* " + sum + "\n"
+  message = message + "*Mean:* " + (sum / a)
+
+
+  _ = message >> chat
