@@ -1,32 +1,19 @@
 command(Number i):
 
-  episode = ""
+  movies =  [ {"i" : 4, "episode" : "I"}
+            , {"i" : 5, "episode" : "II"}
+            , {"i" : 6, "episode" : "III"}
+            , {"i" : 1, "episode" : "IV"}
+            , {"i" : 2, "episode" : "V"}
+            , {"i" : 5, "episode" : "VI"}
+            , {"i" : 7, "episode" : "VII"}
+            ]
 
-  if (i == 1):
-    episode = "IV"
+  movie = movies . (i - 1)
 
-  if (i == 2):
-    episode = "V"
-
-  if (i == 3):
-    episode = "VI"
-
-  if (i == 4):
-    episode = "I"
-
-  if (i == 5):
-    episode = "II"
-
-  if (i == 6):
-    episode = "III"
-
-  if (i == 7):
-    episode = "VII"
-
-  url = "http://swapi.co/api/films/" + i
+  url = "http://swapi.co/api/films/" + (movie . "i")
   rep = << url
 
-  if ((i <= 7) & (i > 0)):
-    _ = ( "*" + "Episode " + episode + "*\n" +
-          "*" + (rep . "title") + "*\n\n" +
-          (rep . "opening_crawl")) >> chat
+  _ = ( "*" + "Episode " + (movie . "episode") + "*\n" +
+        "*" + (rep . "title") + "*\n\n" +
+        (rep . "opening_crawl")) >> chat
