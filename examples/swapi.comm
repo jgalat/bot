@@ -14,6 +14,6 @@ command(Number i):
   url = "http://swapi.co/api/films/" + (movie . "i")
   rep = << url
 
-  _ = ( "*" + "Episode " + (movie . "episode") + "*\n" +
+  _ = ( "*Episode " + (movie . "episode") + "*\n" +
         "*" + (rep . "title") + "*\n\n" +
         (rep . "opening_crawl")) >> chat
