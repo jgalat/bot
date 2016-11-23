@@ -67,7 +67,7 @@ module Bot where
                                 Just cmd -> do
                                   logBot ("Executing " ++ c)
                                   let xdst = fromDebugBotState s
-                                  execute args xdst cmd `catchError` (\err -> logBotError (c ++ ": " ++ err))
+                                  execute args xdst c cmd
                                   logBot ("Finished execution of " ++ c)
                                 Nothing  -> logBot ("Command (" ++ c ++ ") wasn't found.")
                            Failed err   -> logBot err
@@ -119,15 +119,15 @@ module Bot where
         case parseCommand (cs cont) of
           Ok comm    ->
             case check comm of
-              Left err -> do  sendMessageBot ch ("👎\n" ++ err)
-                              raise ("feed: " ++ err)
+              Left err -> do
+                sendMessageBot ch ("👎\n" ++ err)
+                logBotError ("feed: " ++ err)
               Right _  -> do
                 logBot ("New command: " ++ name)
                 let st = s { activeCommands = update (name, comm) (activeCommands s) }
                 sendMessageBot ch "👍"
                 case folder s of
-                  Nothing  -> logBot (name ++ " wasn't saved. Only on memory.") >>
-                              put st
+                  Nothing  -> logBot (name ++ " wasn't saved. Only on memory.")
                   Just fld -> let file = fld ++ name ++ ".comm"
                               in do
                                 logBot ("Saving it in file " ++ file)
@@ -135,9 +135,10 @@ module Bot where
                                       (\e -> let err = show (e :: IOException)
                                              in logInfo lf Error (file ++ ": The file couldn't be opened.\n" ++ err) >>
                                                 logInfo lf Warning (name ++ " wasn't saved. Only on memory."))
-                                put st
-          Failed err -> do  sendMessageBot ch ("👎\n" ++ err)
-                            raise ("feed: " ++ err)
+                put st
+          Failed err -> do
+            sendMessageBot ch ("👎\n" ++ err)
+            logBotError ("feed: " ++ err)
   doRequest (ch, ("feed", _)) = sendMessageBot_ ch "Usage: /feed name \"url\""
   doRequest (ch, (r, args)) = do
         s <- get
@@ -145,22 +146,22 @@ module Bot where
           Just cmd -> do
             logBot ("Executing " ++ r)
             let xst = fromBotState s ch
-            execute args xst cmd `catchError` (\err -> raise (r ++ ": " ++ err))
-          Nothing  -> raise ("Command (" ++ r ++ ") wasn't found.")
+            execute args xst r cmd
+          Nothing  -> logBotError ("Command (" ++ r ++ ") wasn't found.")
 
 --
 -- Execute
 --
 
-  execute :: [Expr] -> BotState -> Comm -> Bot ()
-  execute args xst (Comm prmt c) = do
+  execute :: [Expr] -> BotState -> String -> Comm -> Bot ()
+  execute args xst r (Comm prmt c) = do
     case cmpArgs args (map snd prmt) of
-      Left err  -> raise err
+      Left err  -> logBotError err
       _         -> let  envEx   = mapFromList $ zip (map fst prmt) args
                         execSt  = xst { exprEnv = mapUnion (exprEnv xst) envEx }
                    in do  s <- get
                           put execSt
-                          evalComms c  `catchError` logBotError
+                          evalComms c  `catchError` (\err -> logBotError (r ++ ": " ++ err))
                           put s
 
   cmpArgs :: [Expr] -> [Type] -> Either String ()
