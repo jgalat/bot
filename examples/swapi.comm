@@ -3,28 +3,22 @@ command(Number i):
   episode = ""
 
   if (i == 1):
-    i = 4
-    episode = "I"
-
-  if (i == 2):
-    i = 5
-    episode = "II"
-
-  if (i == 3):
-    i = 6
-    episode = "III"
-
-  if (i == 4):
-    i = 1
     episode = "IV"
 
-  if (i == 5):
-    i = 2
+  if (i == 2):
     episode = "V"
 
-  if (i == 6):
-    i = 3
+  if (i == 3):
     episode = "VI"
+
+  if (i == 4):
+    episode = "I"
+
+  if (i == 5):
+    episode = "II"
+
+  if (i == 6):
+    episode = "III"
 
   if (i == 7):
     episode = "VII"
