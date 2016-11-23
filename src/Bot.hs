@@ -79,7 +79,7 @@ module Bot where
       s     <- get
       reply <- getUpdatesBot
       case reply of
-        Nothing   -> logBot "Warning parse error"
+        Nothing   -> logBotWarning "Parse error"
         Just rep  -> case ok rep of
                     True -> case updates rep of
                             []    -> return ()
@@ -109,7 +109,7 @@ module Bot where
                                               mapM_ doRequest requestsOk
                                               s <- get
                                               put (s { updateId = update_id (last upds) + 1 })
-                    _    -> logBot "Warning reply failed"
+                    _    -> logBotWarning "Reply failed"
 
   doRequest :: (Int, (String, [Expr])) -> Bot ()
   doRequest (ch, ("feed", [Str name, Str url])) = do
